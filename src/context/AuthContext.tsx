@@ -92,7 +92,7 @@ function loadProfile(email: string, name: string): UserProfile {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => {
     const storedUser = authService.getStoredUser();
-    return (storedUser as AuthUser | null) ?? DEMO_USER;
+    return storedUser as AuthUser | null
   });
 
   const [profile, setProfile] = useState<UserProfile | null>(() =>

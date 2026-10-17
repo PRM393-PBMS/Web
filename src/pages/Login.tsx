@@ -55,7 +55,7 @@ export default function Login() {
         <div className="auth-header">
           <img src={LOGO_SRC} alt="EasyParking" className="auth-logo" />
           <h1>Đăng nhập</h1>
-          <p>Đăng nhập để đặt chỗ đỗ xe.</p>
+          <p>Đăng nhập nội bộ</p>
         </div>
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <div className="form-field">
@@ -63,7 +63,7 @@ export default function Login() {
             <input
               id="email"
               type="email"
-              placeholder="Nhập email của bạn"
+              placeholder="Nhập email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input-standalone"
@@ -77,7 +77,7 @@ export default function Login() {
               <input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Nhập mật khẩu của bạn"
+                placeholder="Nhập mật khẩu"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="input-standalone"
@@ -108,8 +108,8 @@ export default function Login() {
           <button type="submit" className="btn btn-primary btn-block" disabled={isLoading}><LogIn size={18} strokeWidth={2} aria-hidden />{isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}</button>
         </form>
        
-        <p className="auth-switch">Chưa có tài khoản? <Link to="/dang-ky">Đăng ký ngay</Link></p>
-        <p className="auth-footer-link"><Link to="/"><ArrowLeft size={16} strokeWidth={2} aria-hidden />Về trang chủ</Link></p>
+        {/* <p className="auth-switch">Chưa có tài khoản? <Link to="/dang-ky">Đăng ký ngay</Link></p>
+        <p className="auth-footer-link"><Link to="/"><ArrowLeft size={16} strokeWidth={2} aria-hidden />Về trang chủ</Link></p> */}
       </div>
     </section>
   )
