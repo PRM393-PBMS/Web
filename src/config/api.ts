@@ -1,5 +1,5 @@
 // API Configuration for Backend Connection
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://prm393-backend-u2ym.onrender.com/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://prm393backend.onrender.com/api'
 
 export const API_CONFIG = {
   BASE_URL: API_BASE_URL,
