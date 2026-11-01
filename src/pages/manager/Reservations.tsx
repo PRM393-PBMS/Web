@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { formatUtcToVietnamDate, formatUtcToVietnamDateTime, parseBackendUtcDate } from '../../utils/dateTime'
-import { reservationApi, type ReservationDto } from '../../utils/apiServices'
+import { parkingApi, reservationApi, type ParkingDto, type ReservationDto } from '../../utils/apiServices'
 
 type DateFilter = 'all' | 'today' | '7days' | '30days'
 
@@ -50,6 +50,33 @@ function isOpenReservation(status?: string) {
   return ['pending', 'confirmed', 'modified'].includes(normalizedStatus(status))
 }
 
+type StaffAction = { status: 'Cancelled' | 'NoShow'; label: string; detail: string; disabledReason?: string }
+
+/** Thao tác backend cho phép với một đơn: huỷ (hoàn cọc nếu đã cọc) hoặc đánh dấu không đến sau giờ hẹn. */
+function staffActions(reservation: ReservationDto, now: number): StaffAction[] {
+  const status = normalizedStatus(reservation.status)
+  if (status === 'pending') {
+    return [{ status: 'Cancelled', label: 'Huỷ đơn chờ cọc', detail: 'Đóng link thanh toán cọc, nhả suất cho khách khác.' }]
+  }
+  if (status === 'confirmed' || status === 'modified') {
+    const expectedAt = parseBackendUtcDate(reservation.expectedEntryTime).getTime()
+    return [
+      {
+        status: 'Cancelled',
+        label: 'Huỷ, hoàn cọc',
+        detail: 'Dùng khi bãi không phục vụ được (sự cố, đóng cửa). Hoàn 100% tiền cọc vào ví khách.',
+      },
+      {
+        status: 'NoShow',
+        label: 'Khách không đến',
+        detail: 'Không hoàn cọc. Hệ thống cũng tự đánh dấu khi quá giờ hẹn 30 phút.',
+        disabledReason: now < expectedAt ? 'Chỉ đánh dấu được sau giờ hẹn.' : undefined,
+      },
+    ]
+  }
+  return []
+}
+
 export default function ManagerReservations() {
   const [reservations, setReservations] = useState<ReservationDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -59,10 +86,13 @@ export default function ManagerReservations() {
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState<DateFilter>('all')
+  const [parkingFilter, setParkingFilter] = useState('all')
+  const [parkings, setParkings] = useState<ParkingDto[]>([])
   const [referenceTime, setReferenceTime] = useState(() => Date.now())
   const [selected, setSelected] = useState<ReservationDto | null>(null)
   const [statusTarget, setStatusTarget] = useState<ReservationDto | null>(null)
-  const [nextStatus, setNextStatus] = useState('Confirmed')
+  const [nextStatus, setNextStatus] = useState<'Cancelled' | 'NoShow' | ''>('')
+  const [actionTime, setActionTime] = useState(0)
 
   const fetchReservations = useCallback(async () => {
     setLoading(true)
@@ -81,6 +111,10 @@ export default function ManagerReservations() {
 
   useEffect(() => {
     queueMicrotask(() => void fetchReservations())
+    parkingApi
+      .getAll()
+      .then((list) => setParkings(Array.isArray(list) ? list : []))
+      .catch(() => setParkings([]))
   }, [fetchReservations])
 
   const filteredReservations = useMemo(() => {
@@ -91,6 +125,8 @@ export default function ManagerReservations() {
       .filter((reservation) => {
         const status = normalizedStatus(reservation.status)
         if (statusFilter !== 'all' && status !== statusFilter) return false
+        if (parkingFilter === 'none' && reservation.parkingId) return false
+        if (parkingFilter !== 'all' && parkingFilter !== 'none' && reservation.parkingId !== parkingFilter) return false
 
         if (dateFilter !== 'all') {
           const entryTime = parseBackendUtcDate(reservation.expectedEntryTime).getTime()
@@ -110,6 +146,8 @@ export default function ManagerReservations() {
             reservation.user?.email,
             reservation.vehicleTypeName,
             reservation.vehicleType?.typeName,
+            reservation.licensePlate,
+            reservation.parkingName,
             reservation.reservationId,
           ].filter(Boolean).join(' ').toLowerCase()
           if (!searchable.includes(term)) return false
@@ -124,7 +162,7 @@ export default function ManagerReservations() {
         const rightTime = parseBackendUtcDate(right.expectedEntryTime).getTime()
         return leftOpen ? leftTime - rightTime : rightTime - leftTime
       })
-  }, [dateFilter, query, referenceTime, reservations, statusFilter])
+  }, [dateFilter, parkingFilter, query, referenceTime, reservations, statusFilter])
 
   const openDetail = async (reservation: ReservationDto) => {
     setActionError('')
@@ -138,13 +176,14 @@ export default function ManagerReservations() {
 
   const openStatusModal = (reservation: ReservationDto) => {
     setStatusTarget(reservation)
-    setNextStatus(RESERVATION_STATUSES.find((status) => normalizedStatus(status) === normalizedStatus(reservation.status)) || 'Confirmed')
+    setActionTime(Date.now())
+    setNextStatus('')
     setActionError('')
     setSelected(null)
   }
 
   const updateStatus = async () => {
-    if (!statusTarget) return
+    if (!statusTarget || !nextStatus) return
     setSaving(true)
     setActionError('')
     try {
@@ -162,12 +201,13 @@ export default function ManagerReservations() {
   const pendingCount = reservations.filter((item) => normalizedStatus(item.status) === 'pending').length
   const confirmedCount = reservations.filter((item) => ['confirmed', 'modified'].includes(normalizedStatus(item.status))).length
   const checkedInCount = reservations.filter((item) => normalizedStatus(item.status) === 'checkedin').length
-  const hasFilters = Boolean(query || statusFilter !== 'all' || dateFilter !== 'all')
+  const hasFilters = Boolean(query || statusFilter !== 'all' || dateFilter !== 'all' || parkingFilter !== 'all')
 
   const clearFilters = () => {
     setQuery('')
     setStatusFilter('all')
     setDateFilter('all')
+    setParkingFilter('all')
   }
 
   return (
@@ -176,7 +216,7 @@ export default function ManagerReservations() {
         <header className="manager-resource-header">
           <div className="manager-resource-title">
             <span className="manager-resource-icon manager-resource-icon--purple"><CalendarCheck2 size={24} aria-hidden /></span>
-            <div><h2>Quản lý đặt chỗ</h2><p>Theo dõi lịch hẹn vào bãi và cập nhật trạng thái đặt chỗ của khách hàng.</p></div>
+            <div><h2>Quản lý đặt chỗ</h2><p>Theo dõi lịch hẹn vào bãi theo từng bãi. Xe đến cổng được nhận đặt chỗ theo biển số; nhân viên chỉ cần huỷ đơn hoặc đánh dấu khách không đến.</p></div>
           </div>
           <div className="manager-header-actions"><button type="button" className="btn btn-outline" onClick={fetchReservations} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} aria-hidden /> Làm mới</button></div>
         </header>
@@ -190,9 +230,10 @@ export default function ManagerReservations() {
 
         <section className="card-panel manager-resource-panel">
           <div className="manager-session-filters">
-            <label className="manager-search-field" htmlFor="reservation-search"><Search size={18} aria-hidden /><input id="reservation-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm khách hàng, email, loại xe hoặc mã đặt chỗ..." />{query && <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setQuery('')}><X size={16} aria-hidden /></button>}</label>
+            <label className="manager-search-field" htmlFor="reservation-search"><Search size={18} aria-hidden /><input id="reservation-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm khách hàng, biển số, bãi hoặc mã đặt chỗ..." />{query && <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setQuery('')}><X size={16} aria-hidden /></button>}</label>
             <div className="manager-session-filter-grid manager-reservation-filter-grid">
               <label><span>Trạng thái</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tất cả trạng thái</option>{RESERVATION_STATUSES.map((status) => <option key={status} value={normalizedStatus(status)}>{statusLabel(status)}</option>)}</select></label>
+              <label><span>Bãi đỗ</span><select value={parkingFilter} onChange={(event) => setParkingFilter(event.target.value)}><option value="all">Tất cả bãi</option>{parkings.map((parking) => <option key={parking.id} value={parking.id}>{parking.name}</option>)}<option value="none">Đơn cũ (chưa gắn bãi)</option></select></label>
               <label><span>Thời gian dự kiến</span><select value={dateFilter} onChange={(event) => setDateFilter(event.target.value as DateFilter)}><option value="all">Tất cả thời gian</option><option value="today">Hôm nay</option><option value="7days">7 ngày qua</option><option value="30days">30 ngày qua</option></select></label>
             </div>
             <div className="manager-session-filter-meta"><span>Hiển thị <strong>{filteredReservations.length}</strong>/{reservations.length} đặt chỗ</span>{hasFilters && <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilters}><X size={15} aria-hidden /> Xóa bộ lọc</button>}</div>
@@ -207,15 +248,16 @@ export default function ManagerReservations() {
           ) : (
             <div className="table-wrap manager-table-wrap">
               <table className="ui-table manager-resource-table manager-reservation-table">
-                <thead><tr><th>Khách hàng</th><th>Loại xe</th><th>Thời gian dự kiến đến</th><th>Thời điểm đặt chỗ</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+                <thead><tr><th>Khách hàng</th><th>Xe</th><th>Bãi</th><th>Thời gian dự kiến đến</th><th>Tiền cọc</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
                 <tbody>{filteredReservations.map((reservation) => (
                   <tr key={reservation.reservationId}>
                     <td><strong>{reservation.userFullName || reservation.user?.fullName || 'Chưa có tên'}</strong>{reservation.user?.email && <small>{reservation.user.email}</small>}</td>
-                    <td><span className="manager-reservation-vehicle"><CarFront size={16} aria-hidden />{reservation.vehicleTypeName || reservation.vehicleType?.typeName || 'Chưa rõ'}</span></td>
-                    <td><strong>{formatUtcToVietnamDateTime(reservation.expectedEntryTime)}</strong></td>
-                    <td>{reservation.createdAt ? formatUtcToVietnamDateTime(reservation.createdAt) : 'Chưa ghi nhận'}</td>
+                    <td><span className="manager-reservation-vehicle"><CarFront size={16} aria-hidden />{reservation.licensePlate || reservation.vehicleTypeName || reservation.vehicleType?.typeName || 'Chưa rõ'}</span></td>
+                    <td>{reservation.parkingName || <small>Chưa gắn bãi</small>}</td>
+                    <td><strong>{formatUtcToVietnamDateTime(reservation.expectedEntryTime)}</strong>{normalizedStatus(reservation.status) === 'pending' && reservation.holdExpiresAt && <small>Hạn cọc {formatUtcToVietnamDateTime(reservation.holdExpiresAt)}</small>}</td>
+                    <td>{reservation.depositAmount != null ? `${reservation.depositAmount.toLocaleString('vi-VN')} đ` : '—'}{reservation.depositStatus && <small>{reservation.depositStatus === 'Success' ? 'Đã trả' : reservation.depositStatus === 'Refunded' ? 'Đã hoàn' : reservation.depositStatus === 'Pending' ? 'Chờ trả' : reservation.depositStatus}</small>}</td>
                     <td><span className={`manager-session-status status-${normalizedStatus(reservation.status)}`}><i />{statusLabel(reservation.status)}</span></td>
-                    <td><div className="manager-row-actions"><button type="button" className="btn btn-outline btn-sm" onClick={() => void openDetail(reservation)}><Eye size={15} aria-hidden /> Xem</button><button type="button" className="btn btn-outline btn-sm manager-edit-button" onClick={() => openStatusModal(reservation)}><Pencil size={15} aria-hidden /> Trạng thái</button></div></td>
+                    <td><div className="manager-row-actions"><button type="button" className="btn btn-outline btn-sm" onClick={() => void openDetail(reservation)}><Eye size={15} aria-hidden /> Xem</button>{isOpenReservation(reservation.status) && <button type="button" className="btn btn-outline btn-sm manager-edit-button" onClick={() => openStatusModal(reservation)}><Pencil size={15} aria-hidden /> Xử lý</button>}</div></td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -231,13 +273,15 @@ export default function ManagerReservations() {
             <div className="manager-reservation-hero"><span><CalendarCheck2 size={25} aria-hidden /></span><div><small>Thời gian dự kiến đến</small><strong>{formatUtcToVietnamDateTime(selected.expectedEntryTime)}</strong><span className={`manager-session-status status-${normalizedStatus(selected.status)}`}><i />{statusLabel(selected.status)}</span></div></div>
             <div className="manager-reservation-detail-grid">
               <div><UserRound size={17} aria-hidden /><span>Khách hàng</span><strong>{selected.userFullName || selected.user?.fullName || 'Chưa có tên'}</strong></div>
-              <div><CarFront size={17} aria-hidden /><span>Loại xe</span><strong>{selected.vehicleTypeName || selected.vehicleType?.typeName || 'Chưa rõ'}</strong></div>
+              <div><CarFront size={17} aria-hidden /><span>Xe</span><strong>{[selected.licensePlate, selected.vehicleTypeName || selected.vehicleType?.typeName].filter(Boolean).join(' · ') || 'Chưa rõ'}</strong></div>
+              <div><CalendarCheck2 size={17} aria-hidden /><span>Bãi đỗ</span><strong>{selected.parkingName || 'Chưa gắn bãi (đơn cũ)'}</strong></div>
+              {selected.checkInFrom && selected.checkInUntil && <div><Clock3 size={17} aria-hidden /><span>Khung vào bãi</span><strong>{formatUtcToVietnamDateTime(selected.checkInFrom)} – {formatUtcToVietnamDateTime(selected.checkInUntil)}</strong></div>}
               <div><CalendarDays size={17} aria-hidden /><span>Thời điểm đặt chỗ</span><strong>{selected.createdAt ? formatUtcToVietnamDateTime(selected.createdAt) : 'Chưa ghi nhận'}</strong></div>
               <div><Clock3 size={17} aria-hidden /><span>Trạng thái hiện tại</span><strong>{statusLabel(selected.status)}</strong></div>
               <div className="manager-reservation-id-field"><QrCode size={17} aria-hidden /><span>Mã đặt chỗ</span><code>{selected.reservationId}</code></div>
             </div>
             {selected.ticket?.qrCodeDataUrl && <div className="manager-reservation-ticket"><img src={selected.ticket.qrCodeDataUrl} alt={`Mã QR đặt chỗ ${selected.reservationId}`} /><div><strong>Vé QR đặt chỗ</strong><span>Khách xuất trình mã này khi đến cổng vào.</span><code>{selected.ticket.qrPayload || selected.reservationId}</code></div></div>}
-            <div className="form-actions"><button type="button" className="btn btn-outline manager-edit-button" onClick={() => openStatusModal(selected)}><Pencil size={16} aria-hidden /> Cập nhật trạng thái</button></div>
+            {isOpenReservation(selected.status) && <div className="form-actions"><button type="button" className="btn btn-outline manager-edit-button" onClick={() => openStatusModal(selected)}><Pencil size={16} aria-hidden /> Xử lý đơn</button></div>}
           </div>
         </div>
       )}
@@ -245,10 +289,18 @@ export default function ManagerReservations() {
       {statusTarget && (
         <div className="modal-overlay" onClick={(event) => event.target === event.currentTarget && !saving && setStatusTarget(null)}>
           <div className="modal-panel manager-form-modal manager-reservation-status-modal" role="dialog" aria-modal="true" aria-labelledby="reservation-status-title">
-            <div className="manager-modal-header"><div><h3 id="reservation-status-title" className="modal-title">Cập nhật trạng thái đặt chỗ</h3><p>{statusTarget.userFullName || statusTarget.user?.fullName || 'Khách hàng'} · {formatUtcToVietnamDateTime(statusTarget.expectedEntryTime)}</p></div><button type="button" className="btn btn-ghost btn-sm" aria-label="Đóng" onClick={() => setStatusTarget(null)} disabled={saving}><X size={20} aria-hidden /></button></div>
-            <div className="form-field"><label htmlFor="reservation-status">Trạng thái mới *</label><select id="reservation-status" autoFocus value={nextStatus} onChange={(event) => setNextStatus(event.target.value)}>{RESERVATION_STATUSES.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></div>
+            <div className="manager-modal-header"><div><h3 id="reservation-status-title" className="modal-title">Xử lý đặt chỗ</h3><p>{statusTarget.userFullName || statusTarget.user?.fullName || 'Khách hàng'} · {formatUtcToVietnamDateTime(statusTarget.expectedEntryTime)}</p></div><button type="button" className="btn btn-ghost btn-sm" aria-label="Đóng" onClick={() => setStatusTarget(null)} disabled={saving}><X size={20} aria-hidden /></button></div>
+            <fieldset className="form-field">
+              <legend>Chọn thao tác *</legend>
+              {staffActions(statusTarget, actionTime).map((action) => (
+                <label key={action.status} className={`manager-choice${action.disabledReason ? ' is-disabled' : ''}`}>
+                  <input type="radio" name="reservation-action" value={action.status} checked={nextStatus === action.status} disabled={Boolean(action.disabledReason) || saving} onChange={() => setNextStatus(action.status)} />
+                  <span><strong>{action.label}</strong><small>{action.disabledReason ?? action.detail}</small></span>
+                </label>
+              ))}
+            </fieldset>
             {actionError && <div className="manager-inline-error" role="alert">{actionError}</div>}
-            <div className="form-actions"><button type="button" className="btn btn-ghost" onClick={() => setStatusTarget(null)} disabled={saving}>Hủy</button><button type="button" className="btn btn-primary" onClick={() => void updateStatus()} disabled={saving || normalizedStatus(nextStatus) === normalizedStatus(statusTarget.status)}>{saving ? 'Đang cập nhật...' : 'Lưu trạng thái'}</button></div>
+            <div className="form-actions"><button type="button" className="btn btn-ghost" onClick={() => setStatusTarget(null)} disabled={saving}>Hủy</button><button type="button" className="btn btn-primary" onClick={() => void updateStatus()} disabled={saving || !nextStatus}>{saving ? 'Đang xử lý...' : 'Xác nhận'}</button></div>
           </div>
         </div>
       )}

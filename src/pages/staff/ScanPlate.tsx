@@ -42,6 +42,7 @@ import {
   parkingSessionApi,
   reservationApi,
   gateApi,
+  floorApi,
   type ParkingSessionTicket,
   type ParkingQrDecodeResult,
   type ParkingSessionDto,
@@ -327,11 +328,16 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     if (!silent) setListLoading(true);
     setListError("");
     try {
-      const [reservationRes, sessionRes, gateRes] = await Promise.all([
+      const [reservationRes, sessionRes, gateRes, floorRes] = await Promise.all([
         reservationApi.getAll(),
         parkingSessionApi.getAll(),
         gateApi.getAll(),
+        floorApi.getAll().catch(() => null),
       ]);
+      // Đặt chỗ gắn theo bãi: cổng chỉ thấy đơn của bãi mình (đơn cũ không gắn bãi thì vẫn hiện).
+      const gateParkingId = gateContext
+        ? floorRes?.result?.find((floor) => floor.floorId === gateContext.floorId)?.parkingId
+        : undefined;
       const floorGateIds = new Set(
         (gateRes.isSuccess ? gateRes.result ?? [] : [])
           .filter(
@@ -351,6 +357,17 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
               ["pending", "confirmed", "modified"].includes(
                 item.status?.toLowerCase(),
               ),
+            )
+            .filter(
+              (item) =>
+                !gateParkingId || !item.parkingId || item.parkingId === gateParkingId,
+            )
+            // Đơn chờ cọc đã quá 15 phút giữ chỗ sẽ bị huỷ, không cần hiện ở cổng.
+            .filter(
+              (item) =>
+                item.status?.toLowerCase() !== "pending" ||
+                !item.holdExpiresAt ||
+                parseBackendUtcDate(item.holdExpiresAt).getTime() > Date.now(),
             )
             .filter(
               (item) =>
