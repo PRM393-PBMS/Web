@@ -9542,3 +9542,59 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   .gate-scan-item { flex-direction: column; }
   .gate-scan-item > img { width: 100%; height: 150px; }
 }
+
+/* ---- Bổ sung: bãi đỗ, ví khuyến mãi, gợi ý lượt quét ---- */
+.page-loading {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+.manager-inline-success {
+  margin: 1rem 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #bbf7d0;
+  border-radius: 9px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 0.86rem;
+}
+.parking-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.parking-coords {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-variant-numeric: tabular-nums;
+}
+.manager-floor-parking {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.gate-scan-suggestion {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #334155;
+}
+.gate-scan-suggestion--ok { background: #f0fdf4; color: #15803d; }
+.gate-scan-suggestion--warn { background: #fffbeb; color: #b45309; }
+.gate-scan-suggestion--danger { background: #fef2f2; color: #b91c1c; }
+.checkout-plate-lookup { margin-top: 0.5rem; }
+.subscription-extras { display: grid; gap: 1rem; margin: 1rem 0; }
+.subscription-extras h4 { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0.5rem; font-size: 0.95rem; }
+.subscription-extras-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.subscription-renewal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.subscription-renewal-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; font-variant-numeric: tabular-nums; }
+.subscription-renewal-list span { color: var(--text-muted); }
+.contract-check { display: flex; align-items: center; gap: 0.4rem; margin: 0.5rem 0 0; font-size: 0.86rem; }
+.contract-check--ok { color: #15803d; }
+.contract-check--bad { color: #b91c1c; }

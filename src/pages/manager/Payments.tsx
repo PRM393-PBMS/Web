@@ -291,6 +291,25 @@ export default function ManagerPayments() {
     setForm((current) => ({ ...current, subscriptionId, userId: subscription?.userId ?? current.userId }))
   }
 
+  // Webhook PayOS tới trễ hoặc mất: hỏi trực tiếp PayOS, đã thanh toán thì máy chủ xử lý đúng một lần.
+  const [reconciling, setReconciling] = useState(false)
+  const reconcile = async (payment: PaymentDto) => {
+    setReconciling(true)
+    try {
+      const response = await apiClient.post<ApiResponse<PaymentDto>>(`/payments/${payment.paymentId}/reconcile`)
+      if (response.isSuccess && response.result) {
+        setSelected(response.result)
+        await fetchPayments()
+      } else {
+        setError(response.message || 'Không đối soát được với PayOS.')
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Không đối soát được với PayOS.')
+    } finally {
+      setReconciling(false)
+    }
+  }
+
   const openDetail = async (payment: PaymentDto) => {
     try {
       const response = await apiClient.get<ApiResponse<PaymentDto>>(`/payments/${payment.paymentId}`)
@@ -398,7 +417,7 @@ export default function ManagerPayments() {
         </div>
       )}
 
-      {selected && <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelected(null)}><div className="modal-panel manager-payment-modal"><div className="manager-modal-header"><div><h3 className="modal-title">Chi tiết thanh toán</h3><p>Thông tin giao dịch và đối tượng liên kết</p></div><button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}><X size={20} /></button></div><div className={`manager-payment-modal-hero manager-payment-modal-hero--${selected.paymentStatus.toLowerCase()}`}><span><Banknote size={25} /></span><div><small>Số tiền</small><strong>{formatCurrency(selected.amount)}</strong><span className={`manager-payment-status ${selected.paymentStatus.toLowerCase()}`}><i />{label(selected.paymentStatus)}</span></div></div><div className="manager-payment-detail-grid manager-payment-detail-grid--complete"><div><span>Mã thanh toán</span><code>{selected.paymentId}</code></div><div><span>Trạng thái</span><strong>{label(selected.paymentStatus)}</strong></div><div><span>Người thanh toán</span><strong>{getPayerName(selected)}</strong></div><div><span>Loại thanh toán</span><strong>{label(selected.paymentType)}</strong></div><div><span>Phương thức</span><strong>{label(selected.paymentMethod)}</strong></div><div><span>Thời gian thanh toán</span><strong>{formatUtcToVietnamDateTime(selected.paymentTime)}</strong></div><div><span>Order code</span><code>{selected.transactionReference || 'Không có'}</code></div><div className="manager-payment-reference-field"><span>Thanh toán cho</span>{renderReferenceButtons(selected)}</div></div><div className="form-actions"><button type="button" className="btn btn-outline manager-edit-button" onClick={() => openEdit(selected)}><Pencil size={16} aria-hidden /> Sửa</button><button type="button" className="btn btn-ghost manager-danger-action" onClick={() => setDeleteTarget(selected)}><Trash2 size={16} /> Xóa</button></div></div></div>}
+      {selected && <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelected(null)}><div className="modal-panel manager-payment-modal"><div className="manager-modal-header"><div><h3 className="modal-title">Chi tiết thanh toán</h3><p>Thông tin giao dịch và đối tượng liên kết</p></div><button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}><X size={20} /></button></div><div className={`manager-payment-modal-hero manager-payment-modal-hero--${selected.paymentStatus.toLowerCase()}`}><span><Banknote size={25} /></span><div><small>Số tiền</small><strong>{formatCurrency(selected.amount)}</strong><span className={`manager-payment-status ${selected.paymentStatus.toLowerCase()}`}><i />{label(selected.paymentStatus)}</span></div></div><div className="manager-payment-detail-grid manager-payment-detail-grid--complete"><div><span>Mã thanh toán</span><code>{selected.paymentId}</code></div><div><span>Trạng thái</span><strong>{label(selected.paymentStatus)}</strong></div><div><span>Người thanh toán</span><strong>{getPayerName(selected)}</strong></div><div><span>Loại thanh toán</span><strong>{label(selected.paymentType)}</strong></div><div><span>Phương thức</span><strong>{label(selected.paymentMethod)}</strong></div><div><span>Thời gian thanh toán</span><strong>{formatUtcToVietnamDateTime(selected.paymentTime)}</strong></div><div><span>Order code</span><code>{selected.transactionReference || 'Không có'}</code></div><div className="manager-payment-reference-field"><span>Thanh toán cho</span>{renderReferenceButtons(selected)}</div></div><div className="form-actions">{selected.paymentStatus.toLowerCase() === 'pending' && selected.paymentMethod?.toLowerCase() === 'payos' && <button type="button" className="btn btn-outline" onClick={() => void reconcile(selected)} disabled={reconciling}><RefreshCw size={16} className={reconciling ? 'spin' : ''} aria-hidden /> {reconciling ? 'Đang đối soát...' : 'Đối soát PayOS'}</button>}<button type="button" className="btn btn-outline manager-edit-button" onClick={() => openEdit(selected)}><Pencil size={16} aria-hidden /> Sửa</button><button type="button" className="btn btn-ghost manager-danger-action" onClick={() => setDeleteTarget(selected)}><Trash2 size={16} /> Xóa</button></div></div></div>}
       {referenceModal && <div className="modal-overlay" onClick={(event) => event.target === event.currentTarget && setReferenceModal(null)}><div className="modal-panel manager-form-modal manager-payment-reference-modal" role="dialog" aria-modal="true"><div className="manager-modal-header"><div><h3 className="modal-title">{referenceModal.title}</h3><p>Dữ liệu liên kết trực tiếp với thanh toán.</p></div><button type="button" className="btn btn-ghost btn-sm" aria-label="Đóng" onClick={() => setReferenceModal(null)}><X size={20} /></button></div>
         {referenceDetailLoading && <div className="manager-empty-state"><RefreshCw size={20} className="spin" aria-hidden /> Đang tải chi tiết...</div>}
         {referenceDetailError && <div className="manager-inline-error" role="alert">{referenceDetailError}</div>}

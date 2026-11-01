@@ -61,6 +61,19 @@ function getOnlinePaymentQr(payment: ParkingOnlinePayment | null) {
   return payment?.paymentQrCodeDataUrl || payment?.PaymentQrCodeDataUrl || ''
 }
 
+const GUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+
+/** SessionId trong vé QR thường, mã ra cổng "PBMS-EXIT:<id>:<mã>" hoặc dán thẳng GUID. */
+function extractGuid(value: string) {
+  return value.match(GUID_PATTERN)?.[0] ?? ''
+}
+
+/** Mã ra cổng 6 ký tự khách đọc cho nhân viên (bảng chữ bỏ 0/O, 1/I như backend). */
+function parseShortGateCode(value: string) {
+  const code = value.toUpperCase().replace(/[\s-]/g, '')
+  return /^[A-HJ-NP-Z2-9]{6}$/.test(code) ? code : null
+}
+
 function getCheckoutPayment(result: ParkingCheckOutResponse | null) {
   return result?.payment || result?.Payment || null
 }
@@ -134,33 +147,18 @@ export default function Checkout() {
   }
 
   useEffect(() => {
-    if (!sessionForCheckout || !licensePlate.trim()) {
-      return
-    }
-
-    if (
-      normalizeLicensePlate(licensePlate) !==
-      normalizeLicensePlate(sessionForCheckout.licensePlateIn)
-    ) {
-      setPlateRecognitionTone('error')
-      setPlateRecognitionNotice('Biển số xe ra không khớp biển số xe vào.')
-    }
-  }, [licensePlate, sessionForCheckout])
-
-  useEffect(() => {
     if (!gateContext || !initialState?.gateAccessGranted) {
       navigate(staffGateSelectionPath('checkout'), { replace: true })
     }
   }, [gateContext, initialState?.gateAccessGranted, navigate])
 
-  useEffect(() => {
-    const pastedSessionId =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(qrPayload.trim())
-        ? qrPayload.trim()
-        : ''
-    const sessionIdToValidate = sessionId || pastedSessionId
+  // Khách mất vé: nhân viên bấm tìm phiên đang mở theo biển số.
+  const [plateLookup, setPlateLookup] = useState('')
 
-    if (!gateContext || !sessionIdToValidate) {
+  useEffect(() => {
+    const ticketSessionId = sessionId || extractGuid(qrPayload)
+    const exitCode = ticketSessionId ? null : parseShortGateCode(qrPayload)
+    if (!gateContext || (!ticketSessionId && !exitCode && !plateLookup)) {
       return
     }
 
@@ -173,19 +171,36 @@ export default function Checkout() {
       setFeePreview(null)
       setFeePreviewError('')
 
-      Promise.all([
-        parkingSessionApi.getAll(),
-        parkingSlotApi.getAll(),
-        gateApi.getAll(),
-      ])
-        .then(async ([sessionResponse, slotResponse, gateResponse]) => {
-          if (stopped) return
+      const findSession = async (): Promise<ParkingSessionDto | null> => {
+        if (ticketSessionId) {
+          const response = await parkingSessionApi.getById(ticketSessionId)
+          return response.isSuccess && response.result?.status?.toLowerCase() === 'active' ? response.result : null
+        }
+        // Mã ra cổng gõ tay hoặc biển số: chỉ lúc này mới cần danh sách phiên.
+        const response = await parkingSessionApi.getAll()
+        const active = (response.result ?? []).filter((item) => item.status?.toLowerCase() === 'active')
+        return exitCode
+          ? active.find((item) => item.exitPass?.code === exitCode) ?? null
+          : active.find((item) => normalizeLicensePlate(item.licensePlateIn) === normalizeLicensePlate(plateLookup)) ?? null
+      }
 
-          const session = sessionResponse.result?.find(
-            (item) => item.sessionId.toLowerCase() === sessionIdToValidate.toLowerCase(),
-          )
+      findSession()
+        .then(async (session) => {
+          if (stopped) return
           if (!session) {
-            setFeePreviewError('Không tìm thấy phiên gửi xe đang hoạt động để đối chiếu.')
+            setFeePreviewError(
+              exitCode
+                ? 'Mã ra cổng không đúng hoặc xe đã ra khỏi bãi.'
+                : plateLookup && !ticketSessionId
+                  ? `Không có xe ${normalizeLicensePlate(plateLookup)} đang gửi trong bãi.`
+                  : 'Không tìm thấy phiên gửi xe đang hoạt động để đối chiếu.',
+            )
+            return
+          }
+          if (!ticketSessionId) {
+            // Đã xác định được phiên: chạy lại bước đối chiếu theo SessionId.
+            setPlateLookup('')
+            setSessionId(session.sessionId)
             return
           }
           setSessionForCheckout(session)
@@ -198,11 +213,13 @@ export default function Checkout() {
           )
 
           const feeRequest = parkingOperationApi.getFeePreview(session.sessionId)
-
           const slotId = session.actualSlotId || session.assignedSlotId
-          const slot = slotId
-            ? slotResponse.result?.find((item) => item.slotId === slotId)
-            : undefined
+          const [gateResponse, slotResponse] = await Promise.all([
+            gateApi.getAll(),
+            slotId ? parkingSlotApi.getById(slotId).catch(() => null) : Promise.resolve(null),
+          ])
+          if (stopped) return
+          const slot = slotResponse?.isSuccess ? slotResponse.result : undefined
           const entryGate = gateResponse.result?.find(
             (item) => item.gateId === session.entryGateId,
           )
@@ -251,7 +268,7 @@ export default function Checkout() {
     return () => {
       stopped = true
     }
-  }, [gateContext, qrPayload, sessionId])
+  }, [gateContext, qrPayload, sessionId, plateLookup])
 
   useEffect(() => {
     if (
@@ -619,6 +636,9 @@ export default function Checkout() {
       normalizeLicensePlate(sessionForCheckout.licensePlateIn),
   )
   const plateMatched = Boolean(sessionForCheckout && licensePlate.trim() && !plateMismatch)
+  const plateNotice = plateMismatch ? 'Biển số xe ra không khớp biển số xe vào.' : plateRecognitionNotice
+  const plateNoticeTone = plateMismatch ? 'error' : plateRecognitionTone
+  const prepaidOnApp = Boolean(sessionForCheckout?.prepaidAt)
   const displayedFee = checkoutResult?.fee || checkoutResult?.Fee || feePreview
   const canCreateCheckout = Boolean(
     !loading &&
@@ -866,19 +886,32 @@ export default function Checkout() {
                         if (event.key === 'Enter') preparePlateForCheckout(licensePlate)
                       }}
                     />
-                    {plateRecognitionNotice && (
+                    {!sessionForCheckout && !sessionId && licensePlate.trim() && (
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm checkout-plate-lookup"
+                        disabled={validatingFloor || hasPendingCheckout}
+                        onClick={() => {
+                          setQrPayload('')
+                          setPlateLookup(licensePlate)
+                        }}
+                      >
+                        Tìm xe theo biển số (khách mất vé)
+                      </button>
+                    )}
+                    {plateNotice && (
                       <p
                         className={`plate-recognition-inline ${
-                          plateRecognitionTone === 'success' ? 'is-success' : 'is-error'
+                          plateNoticeTone === 'success' ? 'is-success' : 'is-error'
                         }`}
-                        role={plateRecognitionTone === 'success' ? 'status' : 'alert'}
+                        role={plateNoticeTone === 'success' ? 'status' : 'alert'}
                       >
-                        {plateRecognitionTone === 'success' ? (
+                        {plateNoticeTone === 'success' ? (
                           <CheckCircle2 size={15} aria-hidden />
                         ) : (
                           <AlertCircle size={15} aria-hidden />
                         )}
-                        {plateRecognitionNotice}
+                        {plateNotice}
                       </p>
                     )}
                   </div>
@@ -934,7 +967,14 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {checkOutType !== 'resident' && (
+                {prepaidOnApp && (
+                  <div className="alert-inline alert-success" role="status">
+                    <CheckCircle2 size={18} aria-hidden />
+                    <span>Khách đã thanh toán trước trên app. Không thu thêm, bấm checkout để cho xe ra.</span>
+                  </div>
+                )}
+
+                {checkOutType !== 'resident' && !prepaidOnApp && (
                   <div className="form-field checkout-payment-field">
                     <label>Thanh toán</label>
                     <select
@@ -957,12 +997,12 @@ export default function Checkout() {
                 )}
 
                 <div className="form-field checkout-field-ticket">
-                  <label>Mã vé xe / SessionId</label>
+                  <label>Vé xe / mã ra cổng (dự phòng)</label>
                   {sessionId && <div className="input-readonly">SessionId: {sessionId}</div>}
                   <input
                     type="text"
                     className="input-standalone"
-                    placeholder="Dán QR payload / SessionId"
+                    placeholder="Quét QR, dán mã vé hoặc nhập mã ra cổng 6 ký tự"
                     value={qrPayload}
                     disabled={hasPendingCheckout}
                     onChange={(event) => {

@@ -18,5 +18,9 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // Hook đi kèm Provider / component trong cùng file vẫn an toàn với fast refresh.
+      'react-refresh/only-export-components': ['error', { allowExportNames: ['useAuth', 'useToast'] }],
+    },
   },
 ])

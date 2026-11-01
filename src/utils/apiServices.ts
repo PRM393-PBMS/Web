@@ -1,4 +1,4 @@
-import { apiClient } from '../config/api'
+import { apiClient, rootApiClient } from '../config/api'
 
 export interface ApiResponse<T = unknown> {
   statusCode: number
@@ -15,6 +15,7 @@ export interface UserDto {
   phoneNumber: string
   status: string
   roleName: string
+  walletId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -141,6 +142,8 @@ export interface SubscriptionRenewalDto {
 
 export interface FloorDto {
   floorId: string
+  parkingId?: string
+  parkingName?: string
   floorName: string
   dedicatedVehicleTypeId?: string | null
   dedicatedVehicleTypeName?: string | null
@@ -193,6 +196,9 @@ export interface ParkingSessionDto {
   paymentMethod?: string
   paymentTime?: string
   ticket?: ParkingSessionTicket
+  /** Khách đã trả trước trên app: có mã ra cổng, cổng ra không thu thêm. */
+  prepaidAt?: string | null
+  exitPass?: { code: string; qrPayload: string; prepaidAt?: string | null } | null
 }
 
 export interface ParkingAvailabilityDto {
@@ -379,6 +385,7 @@ export const vehicleTypeApi = {
 
 export const parkingSlotApi = {
   getAll: () => apiClient.get<ApiResponse<ParkingSlotDto[]>>('/ParkingSlot'),
+  getById: (slotId: string) => apiClient.get<ApiResponse<ParkingSlotDto>>(`/ParkingSlot/${slotId}`),
   updateStatus: (slotId: string, status: string) =>
     apiClient.patch<ApiResponse<ParkingSlotDto>>(`/ParkingSlot/${slotId}/status`, { status }),
 }
@@ -428,8 +435,59 @@ export const vehicleChangeRequestApi = {
     apiClient.delete<ApiResponse>(`/VehicleChangeRequest/change-vehicle/${requestId}`),
 }
 
+export interface WalletAdjustmentResult {
+  adjustmentId: string
+  reasonType: string
+  amount: number
+  note: string
+  walletId: string
+  userId: string
+  walletBalance: number
+  cashBalance: number
+  bonusBalance: number
+  bonusExpiresAt: string | null
+}
+
+export const walletApi = {
+  adjustBonus: (
+    walletId: string,
+    data: { amount: number; reasonType: string; note: string; expiryDays?: number },
+  ) => apiClient.post<ApiResponse<WalletAdjustmentResult>>(`/wallet/${walletId}/adjustments`, data),
+}
+
 export const gateApi = {
   getAll: () => apiClient.get<ApiResponse<GateDto[]>>('/Gate'),
+}
+
+export interface ParkingDto {
+  id: string
+  name: string
+  location: string
+  latitude: number | null
+  longitude: number | null
+  imageUrl: string | null
+  openingHours: string | null
+}
+
+export interface ParkingInput {
+  name: string
+  location: string
+  latitude: number | null
+  longitude: number | null
+  openingHours: string | null
+}
+
+/** Bãi đỗ nằm ở /parkings (không có tiền tố /api) và trả thẳng dữ liệu, lỗi theo mã HTTP. */
+export const parkingApi = {
+  getAll: () => rootApiClient.get<ParkingDto[]>('/parkings'),
+  create: (data: ParkingInput) => rootApiClient.post<ParkingDto>('/parkings', data),
+  update: (id: string, data: ParkingInput) => rootApiClient.patch<ParkingDto>(`/parkings/${id}`, data),
+  remove: (id: string) => rootApiClient.delete<ParkingDto>(`/parkings/${id}`),
+  uploadImage: (id: string, file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return rootApiClient.post<ParkingDto>(`/parkings/${id}/image`, formData)
+  },
 }
 
 export const floorApi = {
@@ -506,6 +564,7 @@ export const parkingOperationApi = {
 
 export const parkingSessionApi = {
   getAll: () => apiClient.get<ApiResponse<ParkingSessionDto[]>>('/ParkingSession'),
+  getById: (sessionId: string) => apiClient.get<ApiResponse<ParkingSessionDto>>(`/ParkingSession/${sessionId}`),
   getMy: () => apiClient.get<ApiResponse<ParkingSessionDto[]>>('/ParkingSession/my'),
   getMyFeePreview: (sessionId: string) =>
     apiClient.get<ApiResponse<ParkingFeePreview>>(

@@ -18,9 +18,11 @@ import {
   type ParkingSessionDto,
   type ReservationDto,
 } from '../../utils/apiServices'
-import { formatUtcToVietnamDateTime, parseBackendUtcDate } from '../../utils/dateTime'
+import { formatUtcToVietnamDateTime, parseBackendUtcDate, toVietnamDateInput } from '../../utils/dateTime'
 
 const ACTIVE_RESERVATION_STATUSES = ['pending', 'confirmed', 'modified']
+/** Tự làm mới khi màn hình để mở cả ca trực. */
+const REFRESH_MS = 30_000
 
 export default function StaffDashboard() {
   const navigate = useNavigate()
@@ -30,8 +32,8 @@ export default function StaffDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true)
+  const loadDashboard = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     setError('')
     const [reservationResult, sessionResult, incidentResult] = await Promise.allSettled([
       reservationApi.getAll(),
@@ -63,6 +65,8 @@ export default function StaffDashboard() {
 
   useEffect(() => {
     queueMicrotask(() => void loadDashboard())
+    const timer = window.setInterval(() => void loadDashboard(true), REFRESH_MS)
+    return () => window.clearInterval(timer)
   }, [loadDashboard])
 
   const activeSessions = useMemo(
@@ -78,7 +82,13 @@ export default function StaffDashboard() {
     [reservations],
   )
   const openIncidents = incidents.filter((item) => item.status?.toLowerCase() !== 'resolved' && item.status?.toLowerCase() !== 'cancelled')
-  const completedToday = sessions.filter((item) => item.status?.toLowerCase() === 'completed').length
+  const today = toVietnamDateInput()
+  const completedToday = sessions.filter(
+    (item) =>
+      item.status?.toLowerCase() === 'completed' &&
+      Boolean(item.exitTime) &&
+      toVietnamDateInput(parseBackendUtcDate(item.exitTime!)) === today,
+  ).length
 
   return (
     <StaffPageShell activeItem="dashboard">
@@ -88,13 +98,13 @@ export default function StaffDashboard() {
             <span className="manager-resource-icon"><Clock3 size={24} aria-hidden /></span>
             <div><h2>Tổng quan vận hành</h2><p>Theo dõi nhanh xe vào, xe ra, lịch đặt trước và sự cố trong ca trực.</p></div>
           </div>
-          <div className="manager-header-actions"><button type="button" className="btn btn-outline" onClick={loadDashboard} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} aria-hidden /> Làm mới</button></div>
+          <div className="manager-header-actions"><button type="button" className="btn btn-outline" onClick={() => void loadDashboard()} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} aria-hidden /> Làm mới</button></div>
         </header>
 
         <section className="manager-summary-grid manager-summary-grid--four">
           <article className="manager-summary-card manager-summary-card--green"><span>Xe đang trong bãi</span><strong>{activeSessions.length}</strong><small>Phiên chưa checkout</small></article>
           <article className="manager-summary-card manager-summary-card--orange"><span>Đặt chỗ chờ đến</span><strong>{upcomingReservations.length}</strong><small>Chờ thanh toán hoặc đã xác nhận</small></article>
-          <article className="manager-summary-card manager-summary-card--accent"><span>Phiên hoàn tất</span><strong>{completedToday}</strong><small>Tổng phiên đã checkout</small></article>
+          <article className="manager-summary-card manager-summary-card--accent"><span>Hoàn tất hôm nay</span><strong>{completedToday}</strong><small>Xe đã ra trong hôm nay</small></article>
           <article className="manager-summary-card manager-summary-card--red"><span>Sự cố đang mở</span><strong>{openIncidents.length}</strong><small>Cần tiếp nhận hoặc xử lý</small></article>
         </section>
 

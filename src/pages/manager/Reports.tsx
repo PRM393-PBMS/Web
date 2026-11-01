@@ -35,6 +35,7 @@ import {
   YAxis,
 } from 'recharts'
 import type { PieLabelRenderProps } from 'recharts'
+import AdminPageShell from '../../components/AdminPageShell'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { apiClient } from '../../config/api'
 import { toVietnamDateInput } from '../../utils/dateTime'
@@ -435,7 +436,9 @@ function renderPieLabel(props: PieLabelRenderProps) {
   return `${percent.toFixed(1)}%`
 }
 
-export default function ManagerReports() {
+/** Báo cáo dùng chung: manager xem trong khu quản lý, admin xem trong khu quản trị. */
+export default function ManagerReports({ area = 'manager' }: { area?: 'manager' | 'admin' }) {
+  const Shell = area === 'admin' ? AdminPageShell : ManagerPageShell
   const defaults = presetDates('7d')
   const [preset, setPreset] = useState<Preset>('7d')
   const [fromDate, setFromDate] = useState(defaults.from)
@@ -483,8 +486,8 @@ export default function ManagerReports() {
   }, [])
 
   useEffect(() => {
-    void fetchReports(fromDate, toDate, groupBy)
-    // chỉ load lần đầu, các thay đổi filter sẽ gọi qua nút áp dụng hoặc select handler
+    // Chỉ tải lần đầu; đổi bộ lọc sẽ gọi qua nút áp dụng hoặc select handler.
+    queueMicrotask(() => void fetchReports(defaults.from, defaults.to, 'day'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -590,7 +593,7 @@ export default function ManagerReports() {
   )
 
   return (
-    <ManagerPageShell activeItem="reports">
+    <Shell activeItem="reports">
       <div className="staff-content-wrapper manager-resource-page manager-report-page">
         <header className="manager-resource-header">
           <div className="manager-resource-title">
@@ -817,6 +820,6 @@ export default function ManagerReports() {
           )}
         </div>
       </div>
-    </ManagerPageShell>
+    </Shell>
   )
 }

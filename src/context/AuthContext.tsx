@@ -38,7 +38,7 @@ interface AuthContextValue {
   profile: UserProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<LoginResult>;
   register: (
     userName: string,
     fullName: string,
@@ -58,14 +58,14 @@ interface AuthContextValue {
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export type LoginResult =
+  | { ok: true; role: UserRole }
+  | { ok: false; message: string };
 
-// Default user for demo
-export const DEMO_USER: AuthUser = {
-  email: "user@easyparking.vn",
-  name: "Nguyễn Văn A",
-  role: "staff",
-};
+/** Web chỉ dành cho back-office; khách hàng dùng app di động. */
+const WEB_ROLES: UserRole[] = ["staff", "manager", "admin"];
+
+const AuthContext = createContext<AuthContextValue | null>(null);
 
 function profileKey(email: string) {
   return `pbms_profile_${email}`;
@@ -107,8 +107,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(
-    async (email: string, password: string): Promise<boolean> => {
-      if (!email.trim() || !password.trim()) return false;
+    async (email: string, password: string): Promise<LoginResult> => {
+      if (!email.trim() || !password.trim()) {
+        return { ok: false, message: "Vui lòng nhập email và mật khẩu." };
+      }
 
       setIsLoading(true);
       try {
@@ -119,20 +121,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (response.isSuccess && response.result) {
           const { user: backendUser } = response.result;
+          const role = (backendUser.roleName?.toLowerCase() || "user") as UserRole;
+          if (!WEB_ROLES.includes(role)) {
+            // Không giữ phiên của tài khoản khách trên web.
+            await authService.logout();
+            return {
+              ok: false,
+              message:
+                "Trang web dành cho nhân viên và quản lý. Khách hàng vui lòng dùng ứng dụng PBMS trên điện thoại.",
+            };
+          }
           persistUser({
             userId: backendUser.userId,
             email: backendUser.email,
             name: backendUser.fullName,
             phone: backendUser.phoneNumber,
-            role: (backendUser.roleName.toLowerCase() as UserRole) || "user",
+            role,
           });
-          return true;
+          return { ok: true, role };
         }
 
-        return false;
+        return {
+          ok: false,
+          message: response.message || "Email hoặc mật khẩu không đúng. Vui lòng thử lại.",
+        };
       } catch (error) {
         console.error("Login error:", error);
-        return false;
+        return { ok: false, message: "Không kết nối được máy chủ. Vui lòng thử lại." };
       } finally {
         setIsLoading(false);
       }

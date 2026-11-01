@@ -156,6 +156,7 @@ export default function StaffGateSelection() {
                     <span className={`manager-floor-symbol ${floor.isResident ? 'resident' : ''}`}><Building2 size={22} /></span>
                     <span>
                       <strong>{floor.floorName}</strong>
+                      {floor.parkingName && <small>{floor.parkingName}</small>}
                       <small><Users size={14} /> {floor.isResident ? 'Cư dân / khách tháng' : allowsReservation ? 'Khách vãng lai / đặt trước' : 'Khách vãng lai'}</small>
                       <small><CarFront size={14} /> {floor.dedicatedVehicleTypeName || 'Dùng chung nhiều loại xe'}</small>
                       <small><DoorOpen size={14} /> {gateCount} cổng {operation === 'checkin' ? 'vào' : 'ra'}</small>
@@ -198,7 +199,7 @@ export default function StaffGateSelection() {
         <div className="staff-gate-selector-footer">
           <div>
             {selectedFloor && selectedGate ? (
-              <><strong>{selectedFloor.floorName} · {selectedGate.gateName}</strong><span>{selectedFloor.isResident ? 'Cư dân' : isCarVehicleTypeName(selectedFloor.dedicatedVehicleTypeName) ? 'Khách / đặt trước' : 'Khách vãng lai'} · {selectedFloor.dedicatedVehicleTypeName || 'Nhiều loại xe'}</span></>
+              <><strong>{selectedFloor.parkingName ? `${selectedFloor.parkingName} · ` : ''}{selectedFloor.floorName} · {selectedGate.gateName}</strong><span>{selectedFloor.isResident ? 'Cư dân' : isCarVehicleTypeName(selectedFloor.dedicatedVehicleTypeName) ? 'Khách / đặt trước' : 'Khách vãng lai'} · {selectedFloor.dedicatedVehicleTypeName || 'Nhiều loại xe'}</span></>
             ) : <span>Hãy hoàn tất 2 bước để tiếp tục.</span>}
           </div>
           <button type="button" className="btn btn-primary" disabled={!selectedFloor || !selectedGate} onClick={continueToOperation}>
