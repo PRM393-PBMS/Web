@@ -1,5 +1,7 @@
 // API Configuration for Backend Connection
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://prm393backend.onrender.com/api'
+/** Gốc máy chủ, cho các API không nằm dưới /api (ví dụ /parkings). */
+export const API_ROOT_URL = API_BASE_URL.replace(/\/api\/?$/, '')
 
 export const API_CONFIG = {
   BASE_URL: API_BASE_URL,
@@ -10,7 +12,7 @@ export const API_CONFIG = {
   },
 }
 
-// API Endpoints
+// API Endpoints (chỉ các đường dẫn còn dùng; các API khác gọi qua utils/apiServices)
 export const API_ENDPOINTS = {
   // Auth
   AUTH_LOGIN: '/auth/login',
@@ -18,11 +20,6 @@ export const API_ENDPOINTS = {
   AUTH_VERIFY_REGISTER_OTP: '/auth/verify-register-otp',
   AUTH_REFRESH: '/auth/refresh-token',
   AUTH_LOGOUT: '/auth/logout',
-
-  // Users (profile — legacy paths)
-  USERS_GET_PROFILE: '/users/profile',
-  USERS_UPDATE_PROFILE: '/users/profile',
-  USERS_LIST: '/users',
 
   // User management (admin)
   USER_GET_ALL: '/User/all',
@@ -37,32 +34,6 @@ export const API_ENDPOINTS = {
   ROLES_CREATE: '/Role',
   ROLES_UPDATE: '/Role',
   ROLES_DELETE: '/Role',
-
-  // Floors
-  FLOORS_GET_ALL: '/floors',
-  FLOORS_GET_BY_ID: '/floors/:id',
-  FLOORS_CREATE: '/floors',
-  FLOORS_UPDATE: '/floors/:id',
-  FLOORS_DELETE: '/floors/:id',
-
-  // Parking Slots
-  SLOTS_GET_ALL: '/parking-slots',
-  SLOTS_GET_BY_FLOOR: '/parking-slots/floor/:floorId',
-  SLOTS_UPDATE: '/parking-slots/:id',
-
-  // Vehicle Types
-  VEHICLE_TYPES_GET_ALL: '/vehicle-types',
-  VEHICLE_TYPES_CREATE: '/vehicle-types',
-  VEHICLE_TYPES_UPDATE: '/vehicle-types/:id',
-
-  // Parking Sessions
-  SESSIONS_CREATE: '/parking-sessions',
-  SESSIONS_GET: '/parking-sessions/:id',
-  SESSIONS_CHECKOUT: '/parking-sessions/:id/checkout',
-
-  // Pricing
-  PRICING_GET: '/pricing-policies',
-  PRICING_UPDATE: '/pricing-policies/:id',
 }
 
 export class ApiRequestError extends Error {
@@ -250,10 +221,13 @@ export class ApiClient {
 
         if (contentType?.includes('application/json')) {
           const errorBody = await response.json()
+          // Lỗi kiểm tra dữ liệu của NestJS trả `message` là mảng.
           const message =
             typeof errorBody?.message === 'string'
               ? errorBody.message
-              : `HTTP ${response.status}`
+              : Array.isArray(errorBody?.message)
+                ? errorBody.message.join('. ')
+                : `HTTP ${response.status}`
           throw new ApiRequestError(response.status, message, errorBody)
         }
 
@@ -345,3 +319,4 @@ export class ApiClient {
 
 // Create a default API client instance
 export const apiClient = new ApiClient()
+export const rootApiClient = new ApiClient(API_ROOT_URL)

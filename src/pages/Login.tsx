@@ -15,37 +15,24 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
 
-  if (isAuthenticated) {
-    if (user?.role === 'staff') return <Navigate to="/staff/dashboard" replace />
-    if (user?.role === 'manager') return <Navigate to="/manager/dashboard" replace />
-    if (user?.role === 'admin') return <Navigate to="/admin/dashboard" replace />
-    return <Navigate to={returnTo || '/dat-cho'} replace />
+  const homeOf = (role?: string) =>
+    role === 'staff' ? '/staff/dashboard' : role === 'manager' ? '/manager/dashboard' : '/admin/dashboard'
+  // Chỉ quay lại trang cũ nếu trang đó thuộc khu của vai trò đang đăng nhập.
+  const destinationFor = (role?: string) =>
+    returnTo && role && returnTo.startsWith(`/${role}/`) ? returnTo : homeOf(role)
+
+  if (isAuthenticated && user) {
+    return <Navigate to={destinationFor(user.role)} replace />
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
-
-    try {
-      const success = await login(email, password)
-      if (success) {
-        const lowerEmail = email.trim().toLowerCase()
-        if (lowerEmail === 'staff' || lowerEmail === 'staff@easyparking.vn') {
-          navigate('/staff/dashboard')
-        } else if (lowerEmail === 'manager' || lowerEmail === 'manager@easyparking.vn') {
-          navigate('/manager/dashboard')
-        } else if (lowerEmail === 'admin' || lowerEmail === 'admin@easyparking.vn') {
-          navigate('/admin/dashboard')
-        } else {
-          navigate(returnTo || '/dat-cho', { replace: true })
-        }
-      } else {
-        setError('Email hoặc mật khẩu không đúng. Vui lòng thử lại.')
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Lỗi đăng nhập. Vui lòng thử lại.'
-      setError(errorMsg)
-      console.error('Login error:', err)
+    const result = await login(email, password)
+    if (result.ok) {
+      navigate(destinationFor(result.role), { replace: true })
+    } else {
+      setError(result.message)
     }
   }
 

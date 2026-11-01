@@ -15,8 +15,10 @@ import {
   CalendarRange,
   CalendarCheck2,
   ParkingSquare,
+  Wallet,
 } from 'lucide-react'
 import ProtectedRoute from '../../components/ProtectedRoute'
+import TodayMetrics from '../../components/TodayMetrics'
 import { MANAGER_NAV } from '../../config/managerNav'
 
 const hubIcons: Record<string, React.ReactNode> = {
@@ -33,6 +35,8 @@ const hubIcons: Record<string, React.ReactNode> = {
   slots: <ParkingSquare size={32} />,
   pricing: <DollarSign size={32} />,
   reports: <BarChart3 size={32} />,
+  parkings: <Building2 size={32} />,
+  wallets: <Wallet size={32} />,
 }
 
 export default function ManagerDashboard() {
@@ -45,6 +49,7 @@ export default function ManagerDashboard() {
           <span><Building2 size={28} aria-hidden /></span>
           <div><p>TRUNG TÂM QUẢN LÝ</p><h1>Quản lý bãi gửi xe</h1><small>Cấu hình tài nguyên, theo dõi vận hành và xử lý công việc tại một nơi.</small></div>
         </header>
+        <TodayMetrics />
         <div className="manager-dashboard-grid">
           {MANAGER_NAV.map((item) => (
             <button

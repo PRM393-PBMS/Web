@@ -258,6 +258,9 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     allowsReservationAtGate ? operationState?.reservationId ?? "" : "",
   );
   const [qrPayload, setQrPayload] = useState("");
+  // Mã gửi xe 1 lần dự phòng (mã chữ 6 ký tự hoặc QR PBMS-ENTRY) khi camera không đọc được biển số.
+  const [entryPassCode, setEntryPassCode] = useState("");
+  const usesEntryPass = checkInType === "guest" && Boolean(entryPassCode.trim());
   const [qrDecode, setQrDecode] = useState<ParkingQrDecodeResult | null>(null);
   const [qrUploading, setQrUploading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -320,8 +323,8 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     queueMicrotask(() => setActivePanel(initialPanel));
   }, [initialPanel]);
 
-  const loadGateLists = async () => {
-    setListLoading(true);
+  const loadGateLists = async (silent = false) => {
+    if (!silent) setListLoading(true);
     setListError("");
     try {
       const [reservationRes, sessionRes, gateRes] = await Promise.all([
@@ -390,10 +393,17 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     }
   };
 
+  // Danh sách đặt trước / xe trong bãi tự làm mới để ca trực không phải bấm tay.
+  const loadGateListsRef = useRef(loadGateLists);
+  useEffect(() => {
+    loadGateListsRef.current = loadGateLists;
+  });
   useEffect(() => {
     queueMicrotask(() => {
-      void loadGateLists();
+      void loadGateListsRef.current();
     });
+    const timer = window.setInterval(() => void loadGateListsRef.current(true), 30_000);
+    return () => window.clearInterval(timer);
   }, [gateContext]);
 
   const setPlateForConfirm = (plate: string) => {
@@ -410,6 +420,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     setDriverEntryImageUrl("");
     setReservationId("");
     setQrPayload("");
+    setEntryPassCode("");
     setQrDecode(null);
     setMessageTone("error");
     setPlateRecognitionTone("error");
@@ -479,13 +490,13 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
       setMessage("Lượt quét đã được xử lý hoặc bỏ qua. Vui lòng chọn lượt khác.");
       return;
     }
-    if (!licensePlate.trim()) {
+    if (!licensePlate.trim() && !usesEntryPass) {
       setPlateRecognitionTone("error");
       setPlateRecognitionNotice("Vui lòng nhập hoặc chụp biển số xe.");
       return;
     }
     if (!gateId) return;
-    if (checkInType !== "reservation" && !vehicleTypeId) return;
+    if (checkInType !== "reservation" && !vehicleTypeId && !usesEntryPass) return;
     if (checkInType === "reservation" && !reservationId && !qrPayload.trim()) {
       setMessageTone("error");
       setMessage("Vui lòng upload ảnh QR đặt chỗ hoặc nhập mã QR đặt chỗ");
@@ -509,7 +520,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
         vehicleTypeId:
           checkInType === "reservation" ? undefined : vehicleTypeId,
         reservationId: reservationId || undefined,
-        qrPayload: qrPayload.trim() || undefined,
+        qrPayload: (usesEntryPass ? entryPassCode : qrPayload).trim() || undefined,
         gateId,
         entryImageUrl: entryImageUrl || undefined,
         driverEntryImageUrl: driverEntryImageUrl || undefined,
@@ -829,9 +840,9 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     !mobileScanClosed &&
     !uploading &&
     !qrUploading &&
-    licensePlate.trim() &&
+    (licensePlate.trim() || usesEntryPass) &&
     gateId &&
-    (checkInType === "reservation" ? hasReservationCode : vehicleTypeId),
+    (checkInType === "reservation" ? hasReservationCode : vehicleTypeId || usesEntryPass),
   );
   const checkInMessageIsSuccess =
     messageTone === "success" || Boolean(lastCheckInSession);
@@ -1093,6 +1104,25 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                       )}
                     </div>
                   </div>
+
+                  {checkInType === "guest" && (
+                    <div className="form-field form-field--full">
+                      <label htmlFor="entry-pass-code">Mã gửi xe 1 lần (dự phòng)</label>
+                      <input
+                        id="entry-pass-code"
+                        type="text"
+                        className="input-standalone"
+                        placeholder="Mã 6 ký tự trên app khách, chỉ khi không đọc được biển số"
+                        value={entryPassCode}
+                        maxLength={120}
+                        onChange={(event) => setEntryPassCode(event.target.value.trim().toUpperCase())}
+                      />
+                      <small className="field-hint">
+                        Xe đã đăng ký gửi 1 lần trên app được nhận tự động theo biển số. Chỉ nhập mã khi camera và
+                        biển số không dùng được; loại xe và biển số sẽ lấy theo đăng ký.
+                      </small>
+                    </div>
+                  )}
 
                   {checkInType === "reservation" && (
                     <div className="form-field form-field--full reservation-code-field">

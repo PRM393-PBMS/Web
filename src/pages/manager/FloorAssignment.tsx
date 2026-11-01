@@ -3,9 +3,12 @@ import { Building2, CarFront, Layers3, Pencil, Plus, RefreshCw, Search, Trash2, 
 import ManagerConfirmActionModal from '../../components/ManagerConfirmActionModal'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { ApiRequestError, apiClient } from '../../config/api'
+import { parkingApi, type ParkingDto } from '../../utils/apiServices'
 
 interface Floor {
   floorId: string
+  parkingId?: string
+  parkingName?: string
   floorName: string
   totalCapacity: number
   dedicatedVehicleTypeId?: string | null
@@ -27,6 +30,7 @@ interface ApiResponse<T> {
 type FloorScope = 'all' | 'resident' | 'public'
 
 const EMPTY_FORM = {
+  parkingId: '',
   floorName: '',
   totalCapacity: '',
   dedicatedVehicleTypeId: '',
@@ -40,6 +44,7 @@ function errorMessage(error: unknown, fallback: string) {
 export default function ManagerFloorAssignment() {
   const [floors, setFloors] = useState<Floor[]>([])
   const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([])
+  const [parkings, setParkings] = useState<ParkingDto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -81,9 +86,18 @@ export default function ManagerFloorAssignment() {
     }
   }, [])
 
+  const fetchParkings = useCallback(async () => {
+    try {
+      setParkings(await parkingApi.getAll())
+    } catch (requestError) {
+      console.error('Không thể tải bãi đỗ:', requestError)
+      setParkings([])
+    }
+  }, [])
+
   const refreshData = useCallback(async () => {
-    await Promise.all([fetchFloors(), fetchVehicleTypes()])
-  }, [fetchFloors, fetchVehicleTypes])
+    await Promise.all([fetchFloors(), fetchVehicleTypes(), fetchParkings()])
+  }, [fetchFloors, fetchVehicleTypes, fetchParkings])
 
   useEffect(() => {
     queueMicrotask(() => void refreshData())
@@ -93,14 +107,15 @@ export default function ManagerFloorAssignment() {
     const normalized = query.trim().toLowerCase()
     return floors.filter((floor) => {
       const matchesScope = scope === 'all' || (scope === 'resident' ? floor.isResident : !floor.isResident)
-      const matchesQuery = !normalized || `${floor.floorName} ${floor.dedicatedVehicleTypeName ?? ''}`.toLowerCase().includes(normalized)
+      const matchesQuery = !normalized || `${floor.floorName} ${floor.parkingName ?? ''} ${floor.dedicatedVehicleTypeName ?? ''}`.toLowerCase().includes(normalized)
       return matchesScope && matchesQuery
     })
   }, [floors, query, scope])
 
   const openCreate = () => {
     setEditTarget(null)
-    setForm(EMPTY_FORM)
+    // Chỉ có một bãi thì chọn sẵn.
+    setForm({ ...EMPTY_FORM, parkingId: parkings.length === 1 ? parkings[0].id : '' })
     setFormError('')
     setShowModal(true)
   }
@@ -108,6 +123,7 @@ export default function ManagerFloorAssignment() {
   const openEdit = (floor: Floor) => {
     setEditTarget(floor)
     setForm({
+      parkingId: floor.parkingId ?? '',
       floorName: floor.floorName,
       totalCapacity: String(floor.totalCapacity),
       dedicatedVehicleTypeId: floor.dedicatedVehicleTypeId ?? '',
@@ -128,6 +144,10 @@ export default function ManagerFloorAssignment() {
     event.preventDefault()
     const floorName = form.floorName.trim()
     const totalCapacity = Number(form.totalCapacity)
+    if (!form.parkingId) {
+      setFormError('Vui lòng chọn bãi đỗ của tầng.')
+      return
+    }
     if (!floorName) {
       setFormError('Vui lòng nhập tên tầng.')
       return
@@ -141,6 +161,7 @@ export default function ManagerFloorAssignment() {
     setFormError('')
     try {
       const payload = {
+        parkingId: form.parkingId,
         floorName,
         totalCapacity,
         isResident: form.isResident,
@@ -213,7 +234,7 @@ export default function ManagerFloorAssignment() {
                 <article key={floor.floorId} className="manager-floor-card">
                   <div className="manager-floor-card-head">
                     <span className={`manager-floor-symbol${floor.isResident ? ' resident' : ''}`}><Building2 size={22} aria-hidden /></span>
-                    <div><h3>{floor.floorName}</h3><span className={`manager-floor-scope${floor.isResident ? ' resident' : ''}`}>{floor.isResident ? 'Tầng cư dân' : 'Tầng khách'}</span></div>
+                    <div><h3>{floor.floorName}</h3>{floor.parkingName && <small className="manager-floor-parking">{floor.parkingName}</small>}<span className={`manager-floor-scope${floor.isResident ? ' resident' : ''}`}>{floor.isResident ? 'Tầng cư dân' : 'Tầng khách'}</span></div>
                   </div>
                   <div className="manager-floor-metrics">
                     <div><span>Sức chứa</span><strong>{floor.totalCapacity}</strong><small>vị trí</small></div>
@@ -237,12 +258,13 @@ export default function ManagerFloorAssignment() {
             <form onSubmit={handleSave}>
               {formError && <div className="manager-inline-error" role="alert">{formError}</div>}
               <div className="form-grid-2">
+                <div className="form-field form-field--full"><label htmlFor="floor-parking">Bãi đỗ *</label><select id="floor-parking" value={form.parkingId} onChange={(event) => setForm({ ...form, parkingId: event.target.value })}><option value="">Chọn bãi đỗ</option>{parkings.map((parking) => <option key={parking.id} value={parking.id}>{parking.name}</option>)}</select>{parkings.length === 0 && <small className="field-hint">Chưa có bãi đỗ. Tạo bãi ở mục "Bãi đỗ" trước.</small>}</div>
                 <div className="form-field"><label htmlFor="floor-name">Tên tầng *</label><input id="floor-name" autoFocus maxLength={50} value={form.floorName} onChange={(event) => setForm({ ...form, floorName: event.target.value })} placeholder="Ví dụ: B1" /></div>
                 <div className="form-field"><label htmlFor="floor-capacity">Sức chứa *</label><input id="floor-capacity" type="number" min={1} step={1} value={form.totalCapacity} onChange={(event) => setForm({ ...form, totalCapacity: event.target.value })} placeholder="Ví dụ: 100" /></div>
                 <div className="form-field form-field--full"><label htmlFor="floor-vehicle">Loại phương tiện chuyên dụng</label><select id="floor-vehicle" value={form.dedicatedVehicleTypeId} onChange={(event) => setForm({ ...form, dedicatedVehicleTypeId: event.target.value })}><option value="">Dùng chung cho nhiều loại xe</option>{vehicleTypes.map((vehicleType) => <option key={vehicleType.vehicleTypeId} value={vehicleType.vehicleTypeId}>{vehicleType.typeName}</option>)}</select><small className="field-hint">Chọn một loại nếu tầng chỉ phục vụ riêng loại phương tiện đó.</small></div>
                 <label className="manager-checkbox-card form-field--full" htmlFor="floor-resident"><input id="floor-resident" type="checkbox" checked={form.isResident} onChange={(event) => setForm({ ...form, isResident: event.target.checked })} /><span><Users size={19} aria-hidden /><span><strong>Tầng dành cho cư dân / khách tháng</strong><small>Slot tại tầng này được ưu tiên cho gói gửi xe tháng.</small></span></span></label>
               </div>
-              <div className="form-actions"><button type="button" className="btn btn-ghost" onClick={closeModal} disabled={saving}>Hủy</button><button type="submit" className="btn btn-primary" disabled={saving || !form.floorName.trim() || !form.totalCapacity}>{saving ? 'Đang lưu...' : editTarget ? 'Lưu thay đổi' : 'Thêm tầng'}</button></div>
+              <div className="form-actions"><button type="button" className="btn btn-ghost" onClick={closeModal} disabled={saving}>Hủy</button><button type="submit" className="btn btn-primary" disabled={saving || !form.parkingId || !form.floorName.trim() || !form.totalCapacity}>{saving ? 'Đang lưu...' : editTarget ? 'Lưu thay đổi' : 'Thêm tầng'}</button></div>
             </form>
           </div>
         </div>

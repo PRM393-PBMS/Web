@@ -12,6 +12,8 @@ import {
   CalendarCheck2,
   ParkingSquare,
   AlertTriangle,
+  Building2,
+  Wallet,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -24,6 +26,13 @@ export interface NavItem {
 }
 
 export const MANAGER_NAV: NavItem[] = [
+  {
+    id: 'parkings',
+    label: 'Bãi đỗ',
+    path: '/manager/parkings',
+    icon: <Building2 size={18} />,
+    desc: 'Tên, địa chỉ, toạ độ, giờ mở cửa và ảnh bãi',
+  },
   {
     id: 'vehicles',
     label: 'Loại phương tiện',
@@ -114,6 +123,13 @@ export const MANAGER_NAV: NavItem[] = [
     path: '/manager/reports',
     icon: <BarChart3 size={18} />,
     desc: 'Lượt xe, doanh thu, lấp đầy, giờ cao điểm',
+  },
+  {
+    id: 'wallets',
+    label: 'Ví khuyến mãi',
+    path: '/manager/wallets',
+    icon: <Wallet size={18} />,
+    desc: 'Cộng hoặc thu hồi tiền khuyến mãi trong ví khách',
   },
 ]
 

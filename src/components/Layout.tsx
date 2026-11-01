@@ -1,5 +1,4 @@
 import { Outlet, useLocation } from "react-router-dom";
-import Footer from "./Footer";
 import Header from "./Header";
 
 export default function Layout() {
@@ -28,7 +27,6 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      {!isLogin && !isStaffOrAdmin && <Footer />}
     </div>
   );
 }

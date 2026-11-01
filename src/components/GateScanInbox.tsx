@@ -10,6 +10,30 @@ interface Props {
   onUseScan: (scan: GateScan) => void
 }
 
+/** Kết quả đối chiếu của máy chủ (cùng nhãn với app máy quét của nhân viên). */
+function suggestionOf(scan: GateScan): { label: string; tone: 'ok' | 'warn' | 'danger' | 'info' } | null {
+  switch (scan.suggestedType?.toLowerCase()) {
+    case 'reservation':
+      return scan.match?.reservation?.onTime
+        ? { label: 'Có đặt chỗ · đúng giờ', tone: 'ok' }
+        : { label: 'Có đặt chỗ · lệch giờ hẹn', tone: 'warn' }
+    case 'resident':
+      return { label: 'Khách vé tháng', tone: 'ok' }
+    case 'entrypass':
+      return { label: 'Đã đăng ký gửi 1 lần', tone: 'ok' }
+    case 'guest':
+      return { label: 'Khách vãng lai', tone: 'info' }
+    case 'inside':
+      return { label: 'Xe đang trong bãi', tone: 'danger' }
+    case 'checkout':
+      return { label: 'Đang gửi · chờ checkout', tone: 'info' }
+    case 'unknown':
+      return scan.licensePlate ? { label: 'Không có phiên gửi xe', tone: 'warn' } : null
+    default:
+      return null
+  }
+}
+
 export default function GateScanInbox({
   realtime,
   disabled,
@@ -82,6 +106,11 @@ export default function GateScanInbox({
               />
               <div>
                 <strong>{scan.licensePlate || 'Chưa đọc được biển số'}</strong>
+                {suggestionOf(scan) && (
+                  <span className={`gate-scan-suggestion gate-scan-suggestion--${suggestionOf(scan)!.tone}`}>
+                    {suggestionOf(scan)!.label}
+                  </span>
+                )}
                 <small>
                   {scan.scannedBy?.fullName || 'Nhân viên'} ·{' '}
                   {formatUtcToVietnamDateTime(scan.capturedAt)}

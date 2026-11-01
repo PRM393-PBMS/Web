@@ -101,8 +101,8 @@ export default function Exception() {
     setResolveTarget(incident);
   };
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError("");
     const [incidentResult, sessionResult] = await Promise.allSettled([
       incidentReportApi.getAll(),
@@ -141,6 +141,9 @@ export default function Exception() {
 
   useEffect(() => {
     queueMicrotask(() => void loadData());
+    // Sự cố mới từ khách / quản lý hiện ra mà không cần bấm làm mới.
+    const timer = window.setInterval(() => void loadData(true), 30_000);
+    return () => window.clearInterval(timer);
   }, [loadData]);
 
   const filteredIncidents = useMemo(() => {
@@ -317,7 +320,7 @@ export default function Exception() {
             <button
               type="button"
               className="btn btn-outline"
-              onClick={loadData}
+              onClick={() => void loadData()}
               disabled={loading}
             >
               <RefreshCw

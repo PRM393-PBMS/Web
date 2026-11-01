@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowRight, ShieldCheck } from 'lucide-react'
 import AdminPageShell from '../../components/AdminPageShell'
 import { ADMIN_NAV } from '../../config/adminNav'
+import TodayMetrics from '../../components/TodayMetrics'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
@@ -14,9 +15,10 @@ export default function AdminDashboard() {
           <div>
             <p>TRUNG TÂM QUẢN TRỊ</p>
             <h1>Quản trị hệ thống</h1>
-            <small>Quản lý tài khoản và các vai trò được phép sử dụng trong hệ thống.</small>
+            <small>Tài khoản, vai trò, báo cáo toàn hệ thống và ví khuyến mãi của khách.</small>
           </div>
         </header>
+        <TodayMetrics />
         <div className="manager-dashboard-grid">
           {ADMIN_NAV.filter((item) => item.id !== 'dashboard').map((item) => (
             <button

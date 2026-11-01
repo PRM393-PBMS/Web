@@ -1,4 +1,4 @@
-import { LayoutDashboard, Shield, Users } from 'lucide-react'
+import { BarChart3, LayoutDashboard, Shield, Users, Wallet } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 export interface NavItem {
@@ -30,6 +30,20 @@ export const ADMIN_NAV: NavItem[] = [
     path: '/admin/roles',
     icon: <Shield size={18} />,
     desc: 'Tạo, sửa và xóa các vai trò có thể gán cho tài khoản',
+  },
+  {
+    id: 'reports',
+    label: 'Báo cáo',
+    path: '/admin/reports',
+    icon: <BarChart3 size={18} />,
+    desc: 'Doanh thu và vận hành toàn hệ thống, xuất file',
+  },
+  {
+    id: 'wallets',
+    label: 'Ví khuyến mãi',
+    path: '/admin/wallets',
+    icon: <Wallet size={18} />,
+    desc: 'Cộng hoặc thu hồi tiền khuyến mãi trong ví khách',
   },
 ]
 
