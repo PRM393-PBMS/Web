@@ -29,6 +29,9 @@ import {
   X,
 } from "lucide-react";
 import StaffPageShell from "../../components/StaffPageShell";
+import GateScanInbox from "../../components/GateScanInbox";
+import { useGateScans } from "../../hooks/useGateScans";
+import type { GateScan } from "../../utils/gateScans";
 import ParkingTicketModal from "../../components/ParkingTicketModal";
 import PlateCameraCapture from "../../components/PlateCameraCapture";
 import QrCameraScanner from "../../components/QrCameraScanner";
@@ -240,6 +243,8 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   const [entryTimePreview, setEntryTimePreview] = useState("");
   const vehicleTypeId = gateContext?.dedicatedVehicleTypeId ?? "";
   const gateId = gateContext?.gateId ?? "";
+  const realtime = useGateScans(activePanel === "scan" ? gateId : "");
+  const mobileScanClosed = Boolean(realtime.selectedScan && realtime.selectedScan.status !== "New");
   const [checkInType, setCheckInType] = useState<
     "guest" | "resident" | "reservation"
   >(
@@ -398,6 +403,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   };
 
   const resetScan = (options: { keepResult?: boolean } = {}) => {
+    realtime.selectScan(null);
     setImagePreviewUrl("");
     setEntryImageUrl("");
     setDriverImagePreviewUrl("");
@@ -417,6 +423,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   };
 
   const handlePlateCameraCapture = async (file: File, previewUrl: string) => {
+    realtime.selectScan(null);
     setImagePreviewUrl(previewUrl);
     setUploading(true);
     setMessage("");
@@ -468,6 +475,10 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   };
 
   const handleConfirmCheckIn = async () => {
+    if (mobileScanClosed) {
+      setMessage("Lượt quét đã được xử lý hoặc bỏ qua. Vui lòng chọn lượt khác.");
+      return;
+    }
     if (!licensePlate.trim()) {
       setPlateRecognitionTone("error");
       setPlateRecognitionNotice("Vui lòng nhập hoặc chụp biển số xe.");
@@ -506,6 +517,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
       const res = await parkingOperationApi.checkIn(payload);
 
       if (res.isSuccess) {
+        void realtime.markStatus(realtime.selectedScan?.scanId);
         const session = toParkingSessionFromCheckIn(
           res.result,
           gateId,
@@ -814,6 +826,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
 
   const canConfirm = Boolean(
     !loading &&
+    !mobileScanClosed &&
     !uploading &&
     !qrUploading &&
     licensePlate.trim() &&
@@ -822,6 +835,20 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
   );
   const checkInMessageIsSuccess =
     messageTone === "success" || Boolean(lastCheckInSession);
+
+  const useMobileScan = (scan: GateScan) => {
+    if (scan.gateId !== gateId || scan.status !== "New" || loading || uploading || qrUploading || driverUploading) return;
+    resetScan();
+    realtime.selectScan(scan.scanId);
+    setImagePreviewUrl(scan.imageUrl);
+    setEntryImageUrl(scan.imageUrl);
+    setPlateForConfirm(scan.licensePlate ?? "");
+    const reservation = scan.match?.reservation;
+    setCheckInType(gateContext?.isResident ? "resident" : allowsReservationAtGate && reservation?.onTime ? "reservation" : "guest");
+    if (allowsReservationAtGate && reservation?.onTime) setReservationId(reservation.reservationId);
+    setPlateRecognitionTone(scan.licensePlate ? "success" : "error");
+    setPlateRecognitionNotice(scan.licensePlate ? "Đã nhận biển số từ điện thoại. Kiểm tra trước khi xác nhận." : "Đã nhận ảnh từ điện thoại. Vui lòng nhập biển số để tiếp tục.");
+  };
 
   return (
     <StaffPageShell activeItem={activePanel} onSelectItem={handleSelectSidebar}>
@@ -890,6 +917,10 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
               </div>
             ) : null}
           </header>
+
+          {activePanel === "scan" && gateId && (
+            <GateScanInbox realtime={realtime} disabled={loading || uploading || qrUploading || driverUploading} onUseScan={useMobileScan} />
+          )}
 
           {activePanel === "scan" && (
             <div className="scan-entry-layout">

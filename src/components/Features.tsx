@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiClient, API_CONFIG } from "../config/api";
 import type { ApiResponse } from "../utils/apiServices";
-import { useBooking } from "../context/BookingContext";
+import { useBooking } from "../context/BookingProvider";
 import { formatCurrency } from "../utils/pricing";
 
 interface FloorDto {

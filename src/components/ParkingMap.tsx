@@ -1,7 +1,8 @@
 import { ArrowDown, MapPin, MousePointerClick } from 'lucide-react'
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import type { ParkingFloor, ParkingSpot, SpotStatus } from '../types/parking'
-import { spotLabel as formatSpotLabel } from '../data/parkingLayoutConfig'
+
+const formatSpotLabel = (row: string, number: number) => `${row}${number}`
 
 interface ParkingMapProps {
   floors: ParkingFloor[]
@@ -17,22 +18,22 @@ const STATUS_LABEL: Record<SpotStatus, string> = {
 }
 
 export default function ParkingMap({ floors, onSelect }: ParkingMapProps) {
-  const [activeFloorId, setActiveFloorId] = useState(floors[0]?.id ?? 1)
+  const [activeFloorId, setActiveFloorId] = useState<number | null>(floors[0]?.id ?? null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const floor = floors.find((f) => f.id === activeFloorId) ?? floors[0]
+  const nextFloorId = floor?.id ?? null
+
+  // Reset the selection before rendering a fallback floor after a data refresh.
+  if (activeFloorId !== nextFloorId) {
+    setActiveFloorId(nextFloorId)
+    setSelectedId(null)
+  }
 
   const selectedSpot = useMemo(() => {
     if (!selectedId || !floor) return null
     return floor.spots.find((s) => s.id === selectedId) ?? null
   }, [selectedId, floor])
-
-  useEffect(() => {
-    if (!floors.some((f) => f.id === activeFloorId)) {
-      setActiveFloorId(floors[0]?.id ?? 1)
-      setSelectedId(null)
-    }
-  }, [floors, activeFloorId])
 
   const selectSpot = (spot: ParkingSpot) => {
     if (spot.status === 'occupied' || spot.status === 'assigned' || spot.status === 'disabled') {

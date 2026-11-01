@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import Layout from "./components/Layout";
 
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AuthProvider } from "./context/AuthContext";
 
 import { BookingProvider } from "./context/BookingProvider";
 
@@ -45,17 +45,6 @@ import ManagerReservations from "./pages/manager/Reservations";
 import ManagerPayments from "./pages/manager/Payments";
 import ManagerVehicleChangeRequests from "./pages/manager/VehicleChangeRequests";
 import ManagerIncidents from "./pages/manager/Incidents";
-
-function RoleAwareHome() {
-  const { user } = useAuth();
-
-  if (user?.role === "staff") return <Navigate to="/staff/dashboard" replace />;
-  if (user?.role === "manager")
-    return <Navigate to="/manager/dashboard" replace />;
-  if (user?.role === "admin") return <Navigate to="/admin/dashboard" replace />;
-
-  return <Login />;
-}
 
 export default function App() {
   return (
