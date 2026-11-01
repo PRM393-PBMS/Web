@@ -274,6 +274,33 @@ export class ApiClient {
   }
 
   // Convenience methods
+  async openEventStream(endpoint: string, signal: AbortSignal): Promise<Response> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      signal.throwIfAborted()
+      const headers = this.getHeaders()
+      delete headers['Content-Type']
+      headers.Accept = 'text/event-stream'
+      const response = await fetch(`${this.baseUrl}${endpoint}`, { headers, signal, cache: 'no-store' })
+      if (response.status === 401) {
+        await response.body?.cancel()
+        if (attempt === 0 && await this.refreshAccessToken()) continue
+        signal.throwIfAborted()
+        this.redirectToLogin()
+        throw new ApiRequestError(401, 'Phiên đăng nhập đã hết hạn.', null)
+      }
+      if (!response.ok) {
+        await response.body?.cancel()
+        throw new ApiRequestError(response.status, `Không kết nối được lượt quét (HTTP ${response.status}).`, null)
+      }
+      if (!response.headers.get('content-type')?.includes('text/event-stream') || !response.body) {
+        await response.body?.cancel()
+        throw new Error('Máy chủ chưa trả về luồng lượt quét hợp lệ.')
+      }
+      return response
+    }
+    throw new Error('Không mở được kết nối lượt quét.')
+  }
+
   async get<T>(endpoint: string): Promise<T> {
     return this.request<T>('GET', endpoint)
   }

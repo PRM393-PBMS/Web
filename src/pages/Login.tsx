@@ -1,6 +1,6 @@
-import { AlertCircle, ArrowLeft, LogIn, Eye, EyeOff } from 'lucide-react'
+import { AlertCircle, LogIn, Eye, EyeOff } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const LOGO_SRC = '/image/logo.png'

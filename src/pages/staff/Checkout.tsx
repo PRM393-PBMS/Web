@@ -17,6 +17,9 @@ import {
   XCircle,
 } from 'lucide-react'
 import StaffPageShell from '../../components/StaffPageShell'
+import GateScanInbox from '../../components/GateScanInbox'
+import { useGateScans } from '../../hooks/useGateScans'
+import type { GateScan } from '../../utils/gateScans'
 import PlateCameraCapture from '../../components/PlateCameraCapture'
 import QrCameraScanner from '../../components/QrCameraScanner'
 import {
@@ -94,6 +97,10 @@ export default function Checkout() {
   )
   const [exitTimePreview, setExitTimePreview] = useState(() => initialState?.licensePlate ? formatNowInVietnamTime() : '')
   const [gateId, setGateId] = useState(gateContext?.gateId ?? '')
+  const realtime = useGateScans(gateId)
+  const { markStatus: markScanStatus, clearSelection: clearMobileScan } = realtime
+  const mobileScanId = realtime.selectedScan?.scanId
+  const mobileScanClosed = Boolean(realtime.selectedScan && realtime.selectedScan.status !== 'New')
   const exitGates: GateDto[] = gateContext
     ? [{
         gateId: gateContext.gateId,
@@ -266,6 +273,8 @@ export default function Checkout() {
 
         const status = nextPayment.paymentStatus.toLowerCase()
         if (status === 'success') {
+          void markScanStatus(mobileScanId)
+          clearMobileScan()
           setOnlinePayment(null)
           setPlateRecognitionNotice('')
           setPlateRecognitionTone('error')
@@ -285,7 +294,7 @@ export default function Checkout() {
       stopped = true
       window.clearInterval(timer)
     }
-  }, [checkoutPaymentId, checkoutPaymentMethod, checkoutPaymentStatus])
+  }, [checkoutPaymentId, checkoutPaymentMethod, checkoutPaymentStatus, markScanStatus, mobileScanId, clearMobileScan])
 
   const setPlateForCheckout = (plate: string) => {
     const nextPlate = normalizeLicensePlate(plate)
@@ -298,6 +307,7 @@ export default function Checkout() {
   }
 
   const handlePlateCameraCapture = async (file: File, previewUrl: string) => {
+    realtime.selectScan(null)
     setImagePreviewUrl(previewUrl)
     setUploading(true)
     setMessage('')
@@ -443,6 +453,10 @@ export default function Checkout() {
   }
 
   const handleCheckout = async () => {
+    if (mobileScanClosed) {
+      showMessage('Lượt quét đã được xử lý hoặc bỏ qua. Vui lòng chọn lượt khác.')
+      return
+    }
     if (validatingFloor) {
       showMessage('Đang kiểm tra tầng và cổng checkout, vui lòng chờ.')
       return
@@ -512,6 +526,10 @@ export default function Checkout() {
         const createdPayment = getCheckoutPayment(res.result ?? null)
         setOnlinePayment(payment)
         setCheckoutPayment(createdPayment)
+        if (!createdPayment || createdPayment.paymentStatus.toLowerCase() === 'success') {
+          void markScanStatus(mobileScanId)
+          clearMobileScan()
+        }
         showMessage(res.message || (createdPayment ? 'Đã tạo yêu cầu thanh toán' : 'Checkout thành công'), 'success')
         if (!createdPayment) {
           setPlateForCheckout('')
@@ -555,6 +573,8 @@ export default function Checkout() {
       }
       setCheckoutResult((current) => ({ ...current, ...res.result }))
       setCheckoutPayment(getCheckoutPayment(res.result))
+      void markScanStatus(mobileScanId)
+      clearMobileScan()
       showMessage(res.message || 'Đã nhận tiền và checkout thành công', 'success')
     } catch (err) {
       showMessage(err instanceof Error ? err.message : 'Lỗi kết nối khi xác nhận thanh toán')
@@ -602,6 +622,7 @@ export default function Checkout() {
   const displayedFee = checkoutResult?.fee || checkoutResult?.Fee || feePreview
   const canCreateCheckout = Boolean(
     !loading &&
+    !mobileScanClosed &&
     !uploading &&
     !qrUploading &&
     !validatingFloor &&
@@ -623,6 +644,7 @@ export default function Checkout() {
     setPlateRecognitionTone('error')
     if (keepVehicleData) return
 
+    realtime.selectScan(null)
     setPlateForCheckout('')
     setImagePreviewUrl('')
     setExitImageUrl('')
@@ -637,6 +659,19 @@ export default function Checkout() {
     setFeePreview(null)
     setFeePreviewError('')
     if (qrInputRef.current) qrInputRef.current.value = ''
+  }
+
+  const useMobileScan = (scan: GateScan) => {
+    if (scan.gateId !== gateId || scan.status !== 'New' || loading || uploading || qrUploading || driverUploading || validatingFloor || hasPendingCheckout) return
+    resetCheckout()
+    realtime.selectScan(scan.scanId)
+    setImagePreviewUrl(scan.imageUrl)
+    setExitImageUrl(scan.imageUrl)
+    preparePlateForCheckout(scan.licensePlate ?? '')
+    const activeSessionId = scan.match?.activeSession?.sessionId
+    if (activeSessionId) setSessionId(activeSessionId)
+    setPlateRecognitionTone(scan.licensePlate ? 'success' : 'error')
+    setPlateRecognitionNotice(scan.licensePlate ? 'Đã nhận biển số từ điện thoại. Kiểm tra xe và phí trước khi checkout.' : 'Đã nhận ảnh từ điện thoại. Vui lòng nhập biển số và đọc vé xe.')
   }
 
   return (
@@ -665,6 +700,8 @@ export default function Checkout() {
                 </button>
               </div>
             )}
+
+            {gateId && <GateScanInbox realtime={realtime} disabled={loading || uploading || qrUploading || driverUploading || validatingFloor || hasPendingCheckout} onUseScan={useMobileScan} />}
 
             <div className="checkout-progress" aria-label="Tiến trình checkout">
               <div className={sessionForCheckout ? 'is-complete' : 'is-current'}>

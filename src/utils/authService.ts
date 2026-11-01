@@ -62,7 +62,11 @@ export interface RefreshTokenResponse {
 }
 
 export class AuthService {
-  constructor(private api: ApiClient = apiClient) {}
+  private api: ApiClient
+
+  constructor(api: ApiClient = apiClient) {
+    this.api = api
+  }
 
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     try {
