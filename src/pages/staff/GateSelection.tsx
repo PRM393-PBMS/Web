@@ -22,6 +22,7 @@ import {
   saveStaffGateContext,
   type StaffGateOperation,
 } from '../../utils/staffGateContext'
+import { gateScanApi } from '../../utils/gateScans'
 
 export default function StaffGateSelection() {
   const navigate = useNavigate()
@@ -95,6 +96,8 @@ export default function StaffGateSelection() {
       gateName: selectedGate.gateName,
       gateType: expectedGateType,
     })
+    // Điện thoại máy quét của cùng tài khoản đổi theo cổng này.
+    void gateScanApi.claimGate(selectedGate.gateId).catch(() => {})
     const checkInDestination =
       destination === 'reservations'
         ? '/staff/reservations'

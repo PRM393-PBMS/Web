@@ -858,7 +858,13 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
     setCheckInType(gateContext?.isResident ? "resident" : allowsReservationAtGate && reservation?.onTime ? "reservation" : "guest");
     if (allowsReservationAtGate && reservation?.onTime) setReservationId(reservation.reservationId);
     setPlateRecognitionTone(scan.licensePlate ? "success" : "error");
-    setPlateRecognitionNotice(scan.licensePlate ? "Đã nhận biển số từ điện thoại. Kiểm tra trước khi xác nhận." : "Đã nhận ảnh từ điện thoại. Vui lòng nhập biển số để tiếp tục.");
+    setPlateRecognitionNotice(
+      scan.plateSource === "web"
+        ? "Web tự đọc biển số từ ảnh. Đối chiếu với ảnh trước khi xác nhận."
+        : scan.licensePlate
+          ? "Đã nhận biển số từ điện thoại. Kiểm tra trước khi xác nhận."
+          : "Đã nhận ảnh từ điện thoại. Vui lòng nhập biển số để tiếp tục.",
+    );
   };
 
   return (

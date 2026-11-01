@@ -7,6 +7,8 @@ export interface GateScan {
   gateName: string
   imageUrl: string
   licensePlate: string | null
+  /** 'web': máy chủ không đọc được, web tự đọc từ ảnh (cần staff kiểm tra kỹ). */
+  plateSource?: 'server' | 'web'
   confidence: number | null
   capturedAt: string
   receivedAt: string
@@ -30,6 +32,9 @@ export const gateScanApi = {
       `/GateScan/${encodeURIComponent(id)}/status`,
       { status },
     ),
+  /** Báo cổng đang trực để điện thoại máy quét của cùng tài khoản đổi theo. */
+  claimGate: (gateId: string) =>
+    apiClient.put<ApiResponse<unknown>>('/GateScan/my-gate', { gateId }),
 }
 
 export function mergeGateScans(
