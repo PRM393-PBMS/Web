@@ -19,6 +19,9 @@ const AdminUsers = lazy(() => import("./pages/admin/Users"));
 const AdminRoles = lazy(() => import("./pages/admin/Roles"));
 const AdminReports = lazy(() => import("./pages/admin/Reports"));
 const AdminWallets = lazy(() => import("./pages/admin/Wallets"));
+const AdminLotDesigner = lazy(() => import("./pages/admin/LotDesigner"));
+const AdminParkings = lazy(() => import("./pages/admin/Parkings"));
+const AdminFloors = lazy(() => import("./pages/admin/Floors"));
 
 const ManagerDashboard = lazy(() => import("./pages/manager/Dashboard"));
 const ManagerParkings = lazy(() => import("./pages/manager/Parkings"));
@@ -36,6 +39,8 @@ const ManagerPayments = lazy(() => import("./pages/manager/Payments"));
 const ManagerVehicleChangeRequests = lazy(() => import("./pages/manager/VehicleChangeRequests"));
 const ManagerIncidents = lazy(() => import("./pages/manager/Incidents"));
 const ManagerWallets = lazy(() => import("./pages/manager/Wallets"));
+const ManagerPromoCodes = lazy(() => import("./pages/manager/PromoCodes"));
+const ManagerInvoiceRequests = lazy(() => import("./pages/manager/InvoiceRequests"));
 
 function PageLoading() {
   return (
@@ -74,6 +79,9 @@ export default function App() {
               <Route path="admin/roles" element={<AdminRoles />} />
               <Route path="admin/reports" element={<AdminReports />} />
               <Route path="admin/wallets" element={<AdminWallets />} />
+              <Route path="admin/lot-designer" element={<AdminLotDesigner />} />
+              <Route path="admin/parkings" element={<AdminParkings />} />
+              <Route path="admin/floors" element={<AdminFloors />} />
 
               <Route path="manager/dashboard" element={<ManagerDashboard />} />
               <Route path="manager/parkings" element={<ManagerParkings />} />
@@ -91,6 +99,8 @@ export default function App() {
               <Route path="manager/vehicle-change-requests" element={<ManagerVehicleChangeRequests />} />
               <Route path="manager/incidents" element={<ManagerIncidents />} />
               <Route path="manager/wallets" element={<ManagerWallets />} />
+              <Route path="manager/promo-codes" element={<ManagerPromoCodes />} />
+              <Route path="manager/invoice-requests" element={<ManagerInvoiceRequests />} />
 
               <Route path="*" element={<Navigate to="dang-nhap" replace />} />
             </Route>

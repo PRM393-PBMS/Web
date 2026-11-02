@@ -16,6 +16,8 @@ import {
   CalendarCheck2,
   ParkingSquare,
   Wallet,
+  TicketPercent,
+  FileText,
 } from 'lucide-react'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import TodayMetrics from '../../components/TodayMetrics'
@@ -37,6 +39,8 @@ const hubIcons: Record<string, React.ReactNode> = {
   reports: <BarChart3 size={32} />,
   parkings: <Building2 size={32} />,
   wallets: <Wallet size={32} />,
+  'promo-codes': <TicketPercent size={32} />,
+  'invoice-requests': <FileText size={32} />,
 }
 
 export default function ManagerDashboard() {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Building2, CarFront, Layers3, Pencil, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react'
 import ManagerConfirmActionModal from '../../components/ManagerConfirmActionModal'
+import AdminPageShell from '../../components/AdminPageShell'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { ApiRequestError, apiClient } from '../../config/api'
 import { parkingApi, type ParkingDto } from '../../utils/apiServices'
@@ -41,7 +42,10 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback
 }
 
-export default function ManagerFloorAssignment() {
+/** [area] admin: thêm/sửa/xoá; manager: chỉ xem (cấu trúc bãi do admin quản lý). */
+export default function ManagerFloorAssignment({ area = 'manager' }: { area?: 'manager' | 'admin' }) {
+  const canEdit = area === 'admin'
+  const Shell = area === 'admin' ? AdminPageShell : ManagerPageShell
   const [floors, setFloors] = useState<Floor[]>([])
   const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([])
   const [parkings, setParkings] = useState<ParkingDto[]>([])
@@ -196,14 +200,14 @@ export default function ManagerFloorAssignment() {
   const totalCapacity = floors.reduce((sum, floor) => sum + floor.totalCapacity, 0)
 
   return (
-    <ManagerPageShell activeItem="floors">
+    <Shell activeItem={area === 'admin' ? 'lot-designer' : 'floors'}>
       <div className="staff-content-wrapper manager-resource-page">
         <header className="manager-resource-header">
           <div className="manager-resource-title">
             <span className="manager-resource-icon manager-resource-icon--purple"><Layers3 size={24} aria-hidden /></span>
             <div><h2>Quản lý tầng</h2><p>Cấu hình sức chứa, khu vực phục vụ và loại phương tiện chuyên dụng cho từng tầng.</p></div>
           </div>
-          <div className="manager-header-actions"><button type="button" className="btn btn-outline" onClick={refreshData} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} aria-hidden /> Làm mới</button><button type="button" className="btn btn-primary manager-add-button" onClick={openCreate}><Plus size={18} aria-hidden /> Thêm tầng</button></div>
+          <div className="manager-header-actions"><button type="button" className="btn btn-outline" onClick={refreshData} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} aria-hidden /> Làm mới</button>{canEdit ? <button type="button" className="btn btn-primary manager-add-button" onClick={openCreate}><Plus size={18} aria-hidden /> Thêm tầng</button> : <span className="field-hint">Chỉ admin thêm, sửa, xoá ở mục Thiết kế bãi đỗ.</span>}</div>
         </header>
 
         <section className="manager-summary-grid manager-summary-grid--three" aria-label="Tổng quan tầng">
@@ -241,8 +245,8 @@ export default function ManagerFloorAssignment() {
                     <div><span>Phương tiện</span><strong className="manager-floor-vehicle"><CarFront size={16} aria-hidden /> {floor.dedicatedVehicleTypeName || 'Dùng chung'}</strong></div>
                   </div>
                   <div className="manager-floor-card-actions">
-                    <button type="button" className="btn btn-outline btn-sm manager-edit-button" onClick={() => openEdit(floor)}><Pencil size={15} aria-hidden /> Sửa</button>
-                    <button type="button" className="btn btn-ghost btn-sm manager-danger-action" onClick={() => setDeleteTarget(floor)}><Trash2 size={15} aria-hidden /> Xóa</button>
+                    {canEdit && <button type="button" className="btn btn-outline btn-sm manager-edit-button" onClick={() => openEdit(floor)}><Pencil size={15} aria-hidden /> Sửa</button>}
+                    {canEdit && <button type="button" className="btn btn-ghost btn-sm manager-danger-action" onClick={() => setDeleteTarget(floor)}><Trash2 size={15} aria-hidden /> Xóa</button>}
                   </div>
                 </article>
               ))}
@@ -270,6 +274,6 @@ export default function ManagerFloorAssignment() {
         </div>
       )}
       <ManagerConfirmActionModal open={Boolean(deleteTarget)} title="Xóa tầng?" description={<>Bạn có chắc muốn xóa tầng <strong>{deleteTarget?.floorName}</strong>? Hành động này không thể hoàn tác.</>} targetLabel={deleteTarget?.floorName} targetMeta={deleteTarget ? `${deleteTarget.totalCapacity} vị trí · ${deleteTarget.dedicatedVehicleTypeName || 'Dùng chung'}` : undefined} targetIcon={<Layers3 size={18} aria-hidden />} note="Các slot hoặc cổng đang liên kết với tầng có thể khiến thao tác xóa thất bại." errorFallback="Không thể xóa tầng." onCancel={() => setDeleteTarget(null)} onConfirm={handleDelete} />
-    </ManagerPageShell>
+    </Shell>
   )
 }
