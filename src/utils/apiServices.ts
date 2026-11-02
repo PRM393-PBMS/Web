@@ -76,6 +76,15 @@ export interface ReservationDto {
   status: string
   createdAt?: string
   licensePlate?: string
+  /** Bãi khách chọn khi đặt; null với đơn cũ. */
+  parkingId?: string | null
+  parkingName?: string | null
+  depositAmount?: number | null
+  depositStatus?: string | null
+  /** Đơn chờ cọc: hạn trả cọc (giữ chỗ 15 phút). */
+  holdExpiresAt?: string | null
+  checkInFrom?: string
+  checkInUntil?: string
   user?: {
     fullName?: string
     email?: string
@@ -337,17 +346,20 @@ export const reservationApi = {
 
   getMy: () => apiClient.get<ApiResponse<ReservationDto[]>>('/reservations/my-reservations'),
 
-  getAll: (params?: { status?: string; date?: string }) => {
+  /** `date` là ngày giờ Việt Nam (YYYY-MM-DD). */
+  getAll: (params?: { status?: string; date?: string; parkingId?: string }) => {
     const query = new URLSearchParams()
     if (params?.status) query.set('status', params.status)
     if (params?.date) query.set('date', params.date)
+    if (params?.parkingId) query.set('parkingId', params.parkingId)
     const q = query.toString()
     return apiClient.get<ApiResponse<ReservationDto[]>>(`/reservations${q ? `?${q}` : ''}`)
   },
 
   getById: (id: string) => apiClient.get<ApiResponse<ReservationDto>>(`/reservations/${id}`),
 
-  updateStatus: (id: string, status: string) =>
+  /** Nhân viên chỉ được: huỷ (hoàn 100% cọc nếu đã cọc) hoặc đánh dấu không đến (sau giờ hẹn). */
+  updateStatus: (id: string, status: 'Cancelled' | 'NoShow') =>
     apiClient.put<ApiResponse>(`/reservations/${id}/status`, { status }),
 
   cancel: (id: string) => apiClient.put<ApiResponse>(`/reservations/${id}/cancel`),
