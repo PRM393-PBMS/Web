@@ -31,6 +31,7 @@ import {
 import StaffPageShell from "../../components/StaffPageShell";
 import GateScanInbox from "../../components/GateScanInbox";
 import { useGateScans } from "../../hooks/useGateScans";
+import { useAutoApplyScan } from "../../hooks/useAutoApplyScan";
 import type { GateScan } from "../../utils/gateScans";
 import ParkingTicketModal from "../../components/ParkingTicketModal";
 import PlateCameraCapture from "../../components/PlateCameraCapture";
@@ -883,6 +884,22 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
           : "Đã nhận ảnh từ điện thoại. Vui lòng nhập biển số để tiếp tục.",
     );
   };
+
+  useAutoApplyScan({
+    realtime,
+    apply: useMobileScan,
+    fillPlate: (plate, scan) => {
+      setPlateForConfirm(plate);
+      setPlateRecognitionTone("success");
+      setPlateRecognitionNotice(
+        scan.plateSource === "web"
+          ? "Web tự đọc biển số từ ảnh. Đối chiếu với ảnh trước khi xác nhận."
+          : "Đã nhận biển số từ điện thoại. Kiểm tra trước khi xác nhận.",
+      );
+    },
+    idle: activePanel === "scan" && !loading && !uploading && !qrUploading && !driverUploading,
+    plateEmpty: !licensePlate.trim(),
+  });
 
   return (
     <StaffPageShell activeItem={activePanel} onSelectItem={handleSelectSidebar}>

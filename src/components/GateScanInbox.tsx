@@ -78,8 +78,9 @@ export default function GateScanInbox({
         </span>
       </header>
       <p>
-        Điện thoại chọn cùng cổng rồi chụp biển số. Chọn “Dùng lượt quét” để
-        điền vào form bên dưới. Hiển thị tối đa 20 lượt gần nhất.
+        Điện thoại chụp biển số là lượt quét mới tự điền vào form bên dưới (biển số web đọc xong
+        cũng tự điền). Đang xử lý một xe thì lượt mới chờ ở đây; bấm “Dùng lượt quét” để đổi.
+        Hiển thị tối đa 20 lượt gần nhất.
       </p>
       {realtime.error && (
         <p className="alert-inline alert-error" role="alert">
