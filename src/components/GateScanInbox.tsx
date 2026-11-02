@@ -12,6 +12,8 @@ interface Props {
 
 /** Kết quả đối chiếu của máy chủ (cùng nhãn với app máy quét của nhân viên). */
 function suggestionOf(scan: GateScan): { label: string; tone: 'ok' | 'warn' | 'danger' | 'info' } | null {
+  // Máy chủ chưa đối chiếu biển số do web tự đọc, nên chưa có gợi ý.
+  if (scan.plateSource === 'web') return { label: 'Web tự đọc từ ảnh · kiểm tra lại', tone: 'warn' }
   switch (scan.suggestedType?.toLowerCase()) {
     case 'reservation':
       return scan.match?.reservation?.onTime
@@ -105,7 +107,12 @@ export default function GateScanInbox({
                 loading="lazy"
               />
               <div>
-                <strong>{scan.licensePlate || 'Chưa đọc được biển số'}</strong>
+                <strong>
+                  {scan.licensePlate ||
+                    (realtime.readingIds.includes(scan.scanId)
+                      ? 'Đang đọc biển số…'
+                      : 'Chưa đọc được biển số')}
+                </strong>
                 {suggestionOf(scan) && (
                   <span className={`gate-scan-suggestion gate-scan-suggestion--${suggestionOf(scan)!.tone}`}>
                     {suggestionOf(scan)!.label}

@@ -691,7 +691,13 @@ export default function Checkout() {
     const activeSessionId = scan.match?.activeSession?.sessionId
     if (activeSessionId) setSessionId(activeSessionId)
     setPlateRecognitionTone(scan.licensePlate ? 'success' : 'error')
-    setPlateRecognitionNotice(scan.licensePlate ? 'Đã nhận biển số từ điện thoại. Kiểm tra xe và phí trước khi checkout.' : 'Đã nhận ảnh từ điện thoại. Vui lòng nhập biển số và đọc vé xe.')
+    setPlateRecognitionNotice(
+      scan.plateSource === 'web'
+        ? 'Web tự đọc biển số từ ảnh. Đối chiếu với ảnh, kiểm tra xe và phí trước khi checkout.'
+        : scan.licensePlate
+          ? 'Đã nhận biển số từ điện thoại. Kiểm tra xe và phí trước khi checkout.'
+          : 'Đã nhận ảnh từ điện thoại. Vui lòng nhập biển số và đọc vé xe.',
+    )
   }
 
   return (

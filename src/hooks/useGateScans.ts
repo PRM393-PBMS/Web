@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiClient, ApiRequestError } from '../config/api'
 import {
   gateScanApi,
@@ -6,6 +6,7 @@ import {
   readGateScanStream,
   type GateScan,
 } from '../utils/gateScans'
+import { readPlateFromImage } from '../utils/plateOcr'
 
 export function useGateScans(gateId: string) {
   const [scans, setScans] = useState<GateScan[]>([])
@@ -14,6 +15,10 @@ export function useGateScans(gateId: string) {
   >('connecting')
   const [error, setError] = useState('')
   const [selectedScan, setSelectedScan] = useState<GateScan | null>(null)
+  /** Biển số web tự đọc từ ảnh, theo scanId; null = đã đọc nhưng không ra. */
+  const [webPlates, setWebPlates] = useState<Record<string, string | null>>({})
+  const [readingIds, setReadingIds] = useState<string[]>([])
+  const attempted = useRef(new Set<string>())
 
   useEffect(() => {
     if (!gateId) return
@@ -43,6 +48,8 @@ export function useGateScans(gateId: string) {
         setConnection('connected')
         setError('')
         failures = 0
+        // Mỗi lần (kết nối lại) đều báo cổng: máy chủ chỉ nhớ trong bộ nhớ, khởi động lại là mất.
+        void gateScanApi.claimGate(gateId).catch(() => {})
         // Subscribe before loading history; live events win over an older history response.
         const liveIds = new Set<string>()
         let historyLoaded = false
@@ -141,7 +148,32 @@ export function useGateScans(gateId: string) {
     [gateId],
   )
 
-  const visibleScans = scans.filter((scan) => scan.gateId === gateId)
+  // Máy chủ không đọc được biển số thì web tự đọc ảnh (lượt quét chưa xử lý), lần lượt từng ảnh.
+  useEffect(() => {
+    for (const scan of scans) {
+      if (scan.licensePlate || scan.status !== 'New' || !scan.imageUrl) continue
+      if (attempted.current.has(scan.scanId)) continue
+      attempted.current.add(scan.scanId)
+      setReadingIds((ids) => [...ids, scan.scanId])
+      void readPlateFromImage(scan.imageUrl).then((plate) => {
+        setWebPlates((current) => ({ ...current, [scan.scanId]: plate }))
+        setReadingIds((ids) => ids.filter((id) => id !== scan.scanId))
+      })
+    }
+  }, [scans])
+
+  const withWebPlate = useCallback(
+    (scan: GateScan): GateScan => {
+      if (scan.licensePlate) return { ...scan, plateSource: 'server' }
+      const plate = webPlates[scan.scanId]
+      return plate ? { ...scan, licensePlate: plate, plateSource: 'web' } : scan
+    },
+    [webPlates],
+  )
+
+  const visibleScans = scans
+    .filter((scan) => scan.gateId === gateId)
+    .map(withWebPlate)
   const clearSelection = useCallback(() => setSelectedScan(null), [])
   return {
     scans: visibleScans,
@@ -149,7 +181,10 @@ export function useGateScans(gateId: string) {
     error,
     markStatus,
     clearSelection,
-    selectedScan: selectedScan?.gateId === gateId ? selectedScan : null,
+    /** Lượt quét web đang tự đọc biển số. */
+    readingIds,
+    selectedScan:
+      selectedScan?.gateId === gateId ? withWebPlate(selectedScan) : null,
     selectScan: (id: string | null) =>
       setSelectedScan(visibleScans.find((scan) => scan.scanId === id) ?? null),
   }
