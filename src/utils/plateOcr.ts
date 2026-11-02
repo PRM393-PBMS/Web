@@ -170,17 +170,55 @@ function canvasOf(width: number, height: number) {
   return { canvas, ctx }
 }
 
-/** Ảnh thu nhỏ sang xám để tìm vùng biển số cho nhanh. */
-function smallGray(image: ImageBitmap, width = 480) {
-  const scale = Math.min(1, width / image.width)
-  const { canvas, ctx } = canvasOf(image.width * scale, image.height * scale)
-  ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+/**
+ * Link ảnh cũ lưu dạng http:// (máy chủ sau proxy HTTPS). Render chuyển hướng sang https không kèm CORS
+ * nên trình duyệt chặn; đổi sẵn sang https, trừ máy chạy local.
+ */
+export function secureImageUrl(url: string): string {
+  return /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(url) ? url : url.replace(/^http:\/\//i, 'https://')
+}
+
+/**
+ * Khung căn biển số trên màn máy quét của điện thoại, quy ra toạ độ ảnh chụp dọc:
+ * khung rộng 82% màn hình, cao bằng nửa chiều rộng, tâm ở 42% chiều cao; màn hình (~9:19.5) cắt
+ * hai bên ảnh 3:4. Kèm một vùng rộng hơn phòng khi nhân viên căn lệch.
+ */
+export function phoneFrameBoxes(width: number, height: number): PlateBox[] {
+  if (height <= width) {
+    // Ảnh ngang: không rõ khung, lấy dải giữa.
+    return [{ x: width * 0.15, y: height * 0.25, w: width * 0.7, h: height * 0.5 }]
+  }
+  const box = (wf: number, hf: number, cy: number) => ({
+    x: width * (0.5 - wf / 2),
+    y: height * (cy - hf / 2),
+    w: width * wf,
+    h: height * hf,
+  })
+  return [box(0.5, 0.19, 0.42), box(0.7, 0.3, 0.42)]
+}
+
+/** Một vùng ảnh (mặc định cả ảnh) thu nhỏ sang xám để tìm vùng biển số cho nhanh. */
+function smallGray(image: ImageBitmap, region: PlateBox = { x: 0, y: 0, w: image.width, h: image.height }, width = 480) {
+  const scale = Math.min(1, width / region.w)
+  const { canvas, ctx } = canvasOf(region.w * scale, region.h * scale)
+  ctx.drawImage(image, region.x, region.y, region.w, region.h, 0, 0, canvas.width, canvas.height)
   const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const gray = new Uint8Array(canvas.width * canvas.height)
   for (let i = 0; i < gray.length; i++) {
     gray[i] = Math.round(data[i * 4] * 0.299 + data[i * 4 + 1] * 0.587 + data[i * 4 + 2] * 0.114)
   }
   return { gray, width: canvas.width, height: canvas.height, scale }
+}
+
+/** Vùng giống biển số bên trong `region`, quy về toạ độ ảnh gốc. */
+function plateBoxesIn(image: ImageBitmap, region?: PlateBox): PlateBox[] {
+  const small = smallGray(image, region)
+  return findPlateBoxes(small.gray, small.width, small.height).map((b) => ({
+    x: (region?.x ?? 0) + b.x / small.scale,
+    y: (region?.y ?? 0) + b.y / small.scale,
+    w: b.w / small.scale,
+    h: b.h / small.scale,
+  }))
 }
 
 /**
@@ -201,30 +239,40 @@ function crop(image: ImageBitmap, box: PlateBox) {
 }
 
 /**
- * Đọc biển số từ ảnh lượt quét: tìm vùng giống biển số rồi đọc từng vùng, không ra thì đọc cả ảnh.
- * Trả null khi không đọc được, không ném lỗi.
+ * Đọc biển số từ ảnh lượt quét, thử lần lượt tới khi ra biển số:
+ * vùng giống biển trong khung căn của điện thoại → chính khung căn (sát, rộng) → vùng giống biển trong cả ảnh → cả ảnh.
+ * Trả null khi không đọc được, không ném lỗi (lý do ghi ở console để dò lỗi).
  */
 export function readPlateFromImage(imageUrl: string): Promise<string | null> {
   const job = queue.then(async () => {
+    const url = secureImageUrl(imageUrl)
     try {
-      const response = await fetch(imageUrl, { mode: 'cors' })
-      if (!response.ok) return null
+      const response = await fetch(url, { mode: 'cors' })
+      if (!response.ok) {
+        console.warn(`[plateOcr] Không tải được ảnh ${url}: HTTP ${response.status}`)
+        return null
+      }
       const image = await createImageBitmap(await response.blob())
-      const small = smallGray(image)
-      const boxes = findPlateBoxes(small.gray, small.width, small.height).map((b) => ({
-        x: b.x / small.scale,
-        y: b.y / small.scale,
-        w: b.w / small.scale,
-        h: b.h / small.scale,
-      }))
+      const frames = phoneFrameBoxes(image.width, image.height)
+      const candidates = [
+        ...plateBoxesIn(image, frames[frames.length - 1]),
+        ...frames,
+        ...plateBoxesIn(image),
+        { x: 0, y: 0, w: image.width, h: image.height },
+      ]
       const w = await getWorker()
-      for (const box of [...boxes, { x: 0, y: 0, w: image.width, h: image.height }]) {
+      const seen: string[] = []
+      for (const box of candidates) {
         const { data } = await w.recognize(crop(image, box))
         const plate = pickPlate(data.text)
         if (plate) return plate
+        if (data.text.trim()) seen.push(data.text.trim().replace(/\s+/g, ' '))
       }
+      console.info(`[plateOcr] Không ra biển số từ ${url}. Chữ đọc được: ${seen.join(' | ') || '(không có)'}`)
       return null
-    } catch {
+    } catch (error) {
+      // Thường là CORS: origin của web chưa nằm trong CORS_ORIGIN của backend.
+      console.warn(`[plateOcr] Lỗi đọc ảnh ${url}:`, error)
       return null
     }
   })

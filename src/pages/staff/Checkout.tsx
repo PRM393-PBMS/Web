@@ -19,6 +19,7 @@ import {
 import StaffPageShell from '../../components/StaffPageShell'
 import GateScanInbox from '../../components/GateScanInbox'
 import { useGateScans } from '../../hooks/useGateScans'
+import { useAutoApplyScan } from '../../hooks/useAutoApplyScan'
 import type { GateScan } from '../../utils/gateScans'
 import PlateCameraCapture from '../../components/PlateCameraCapture'
 import QrCameraScanner from '../../components/QrCameraScanner'
@@ -699,6 +700,22 @@ export default function Checkout() {
           : 'Đã nhận ảnh từ điện thoại. Vui lòng nhập biển số và đọc vé xe.',
     )
   }
+
+  useAutoApplyScan({
+    realtime,
+    apply: useMobileScan,
+    fillPlate: (plate, scan) => {
+      preparePlateForCheckout(plate)
+      setPlateRecognitionTone('success')
+      setPlateRecognitionNotice(
+        scan.plateSource === 'web'
+          ? 'Web tự đọc biển số từ ảnh. Đối chiếu với ảnh, kiểm tra xe và phí trước khi checkout.'
+          : 'Đã nhận biển số từ điện thoại. Kiểm tra xe và phí trước khi checkout.',
+      )
+    },
+    idle: Boolean(gateId) && !loading && !uploading && !qrUploading && !driverUploading && !validatingFloor && !hasPendingCheckout,
+    plateEmpty: !licensePlate.trim(),
+  })
 
   return (
       <StaffPageShell activeItem="checkout">
