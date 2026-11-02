@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CarFront, Layers3, Pencil, Plus, RefreshCw, Search, SquareParking, Trash2, X } from 'lucide-react'
-import ManagerConfirmActionModal from '../../components/ManagerConfirmActionModal'
+import { CarFront, Layers3, Pencil, RefreshCw, Search, SquareParking, X } from 'lucide-react'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { apiClient } from '../../config/api'
 
@@ -82,7 +81,6 @@ export default function ManagerSlots() {
   const [editTarget, setEditTarget] = useState<ParkingSlot | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<ParkingSlot | null>(null)
 
   const fetchSlots = async () => {
     setLoading(true)
@@ -143,12 +141,6 @@ export default function ManagerSlots() {
     return acc
   }, {})
 
-  const openCreate = () => {
-    setEditTarget(null)
-    setForm(EMPTY_FORM)
-    setShowModal(true)
-  }
-
   const openEdit = (slot: ParkingSlot) => {
     setEditTarget(slot)
     setForm({
@@ -170,13 +162,12 @@ export default function ManagerSlots() {
     e.preventDefault()
     setSaving(true)
     try {
-      if (editTarget) {
-        await apiClient.put<ApiResponse<ParkingSlot>>('/ParkingSlot', {
-          slotId: editTarget.slotId,
-          ...form,
-        })
-      } else {
-        await apiClient.post<ApiResponse<ParkingSlot>>('/ParkingSlot', form)
+      if (!editTarget) return
+      // Chỉ đổi trạng thái; mã, tầng, loại xe của ô do sơ đồ bãi quản lý.
+      const res = await apiClient.patch<ApiResponse<ParkingSlot>>(`/ParkingSlot/${editTarget.slotId}/status`, { status: form.status })
+      if (!res.isSuccess) {
+        alert(res.message || 'Không đổi được trạng thái ô.')
+        return
       }
       closeModal()
       await fetchSlots()
@@ -188,20 +179,14 @@ export default function ManagerSlots() {
     }
   }
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    const response = await apiClient.delete<ApiResponse<unknown>>(`/ParkingSlot/${deleteTarget.slotId}`)
-    if (!response.isSuccess) throw new Error(response.message ?? 'Không thể xóa slot.')
-    setDeleteTarget(null)
-    await fetchSlots()
-  }
+
 
   return (
     <ManagerPageShell activeItem="slots">
       <div className="staff-content-wrapper manager-resource-page">
         <header className="manager-resource-header">
           <div className="manager-resource-title"><span className="manager-resource-icon manager-resource-icon--orange"><SquareParking size={24} aria-hidden /></span><div><h2>Quản lý slot đỗ xe</h2><p>Theo dõi trạng thái, tầng và loại phương tiện của từng vị trí đỗ xe.</p></div></div>
-          <div className="manager-header-actions"><button type="button" className="btn btn-outline" onClick={fetchSlots} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} aria-hidden /> Làm mới</button><button type="button" className="btn btn-primary manager-add-button" onClick={openCreate}><Plus size={18} aria-hidden /> Thêm slot</button></div>
+          <div className="manager-header-actions"><button type="button" className="btn btn-outline" onClick={fetchSlots} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} aria-hidden /> Làm mới</button><span className="field-hint">Thêm, xoá, đổi mã ô ở mục Thiết kế bãi đỗ (admin). Bấm ô để đổi trạng thái.</span></div>
         </header>
 
         <section className="manager-summary-grid manager-summary-grid--four" aria-label="Tổng quan slot đỗ xe">
@@ -256,7 +241,7 @@ export default function ManagerSlots() {
                       </span>
                     </td>
                     <td>
-                      <div className="manager-row-actions"><button type="button" className="btn btn-outline btn-sm manager-edit-button" onClick={() => openEdit(slot)}><Pencil size={15} aria-hidden /> Sửa</button><button type="button" className="btn btn-ghost btn-sm manager-danger-action" onClick={() => setDeleteTarget(slot)}><Trash2 size={15} aria-hidden /> Xóa</button></div>
+                      <div className="manager-row-actions"><button type="button" className="btn btn-outline btn-sm manager-edit-button" onClick={() => openEdit(slot)}><Pencil size={15} aria-hidden /> Sửa</button></div>
                     </td>
                   </tr>
                 ))}
@@ -279,6 +264,7 @@ export default function ManagerSlots() {
                 <input
                   id="slot-code"
                   type="text"
+                  disabled
                   required
                   value={form.slotCode}
                   onChange={(e) => setForm({ ...form, slotCode: e.target.value })}
@@ -291,7 +277,7 @@ export default function ManagerSlots() {
                   id="slot-floor"
                   required
                   value={form.floorId}
-                  disabled={optionsLoading}
+                  disabled
                   onChange={(e) => {
                     const floor = floors.find((item) => item.floorId === e.target.value)
                     setForm({
@@ -311,7 +297,7 @@ export default function ManagerSlots() {
                   id="slot-vtype"
                   required
                   value={form.vehicleTypeId}
-                  disabled={optionsLoading}
+                  disabled
                   onChange={(e) => setForm({ ...form, vehicleTypeId: e.target.value })}
                 >
                   <option value="" disabled>{optionsLoading ? 'Đang tải loại xe...' : '-- Chọn loại xe --'}</option>
@@ -337,14 +323,13 @@ export default function ManagerSlots() {
                   Hủy
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={saving || optionsLoading || !form.floorId || !form.vehicleTypeId}>
-                  {saving ? 'Đang lưu...' : editTarget ? 'Lưu thay đổi' : 'Thêm slot'}
+                  {saving ? 'Đang lưu...' : 'Lưu trạng thái'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-      <ManagerConfirmActionModal open={Boolean(deleteTarget)} title="Xóa slot đỗ xe?" description={<>Bạn có chắc muốn xóa slot <strong>{deleteTarget?.slotCode}</strong>? Hành động này không thể hoàn tác.</>} targetLabel={deleteTarget?.slotCode} targetMeta={deleteTarget ? `${deleteTarget.floorName} · ${deleteTarget.vehicleTypeName} · ${getLabel(deleteTarget.status)}` : undefined} targetIcon={<SquareParking size={18} aria-hidden />} note="Slot đang có xe, đã được đặt hoặc liên kết với gói tháng có thể không xóa được." errorFallback="Không thể xóa slot." onCancel={() => setDeleteTarget(null)} onConfirm={handleDelete} />
     </ManagerPageShell>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Building2, ImagePlus, MapPin, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import ManagerConfirmActionModal from '../../components/ManagerConfirmActionModal'
+import AdminPageShell from '../../components/AdminPageShell'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { API_ROOT_URL } from '../../config/api'
 import { parkingApi, type ParkingDto } from '../../utils/apiServices'
@@ -23,7 +24,10 @@ function parseCoordinate(value: string, min: number, max: number) {
   return Number.isFinite(number) && number >= min && number <= max ? number : Number.NaN
 }
 
-export default function ManagerParkings() {
+/** [area] admin: thêm/sửa/xoá; manager: chỉ xem (cấu trúc bãi do admin quản lý). */
+export default function ManagerParkings({ area = 'manager' }: { area?: 'manager' | 'admin' }) {
+  const canEdit = area === 'admin'
+  const Shell = area === 'admin' ? AdminPageShell : ManagerPageShell
   const [parkings, setParkings] = useState<ParkingDto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -157,7 +161,7 @@ export default function ManagerParkings() {
   const withCoordinates = parkings.filter((item) => item.latitude !== null && item.longitude !== null).length
 
   return (
-    <ManagerPageShell activeItem="parkings">
+    <Shell activeItem={area === 'admin' ? 'lot-designer' : 'parkings'}>
       <div className="staff-content-wrapper manager-resource-page">
         <header className="manager-resource-header">
           <div className="manager-resource-title">
@@ -169,7 +173,7 @@ export default function ManagerParkings() {
           </div>
           <div className="manager-header-actions">
             <button type="button" className="btn btn-outline" onClick={fetchParkings} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} aria-hidden /> Làm mới</button>
-            <button type="button" className="btn btn-primary manager-add-button" onClick={openCreate}><Plus size={18} aria-hidden /> Thêm bãi đỗ</button>
+            {canEdit ? <button type="button" className="btn btn-primary manager-add-button" onClick={openCreate}><Plus size={18} aria-hidden /> Thêm bãi đỗ</button> : <span className="field-hint">Chỉ admin thêm, sửa, xoá ở mục Thiết kế bãi đỗ.</span>}
           </div>
         </header>
 
@@ -214,9 +218,9 @@ export default function ManagerParkings() {
                       ? <span className="parking-coords"><MapPin size={14} aria-hidden /> {item.latitude.toFixed(5)}, {item.longitude.toFixed(5)}</span>
                       : <span className="manager-muted-value">Chưa nhập</span>}</td>
                     <td><div className="manager-row-actions">
-                      <button type="button" className="btn btn-outline btn-sm manager-edit-button" onClick={() => openEdit(item)}><Pencil size={15} aria-hidden /> Sửa</button>
+                      {canEdit && <button type="button" className="btn btn-outline btn-sm manager-edit-button" onClick={() => openEdit(item)}><Pencil size={15} aria-hidden /> Sửa</button>}
                       <button type="button" className="btn btn-outline btn-sm" onClick={() => pickImage(item)} disabled={uploadingId === item.id}><ImagePlus size={15} aria-hidden /> {uploadingId === item.id ? 'Đang tải...' : 'Ảnh'}</button>
-                      <button type="button" className="btn btn-ghost btn-sm manager-danger-action" onClick={() => setDeleteTarget(item)}><Trash2 size={15} aria-hidden /> Xóa</button>
+                      {canEdit && <button type="button" className="btn btn-ghost btn-sm manager-danger-action" onClick={() => setDeleteTarget(item)}><Trash2 size={15} aria-hidden /> Xóa</button>}
                     </div></td>
                   </tr>
                 ))}
@@ -261,6 +265,6 @@ export default function ManagerParkings() {
         onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
       />
-    </ManagerPageShell>
+    </Shell>
   )
 }

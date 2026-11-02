@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DoorOpen, Layers3, LogIn, LogOut, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
-import ManagerConfirmActionModal from '../../components/ManagerConfirmActionModal'
+import { DoorOpen, Layers3, LogIn, LogOut, RefreshCw, Search, X } from 'lucide-react'
 import ManagerPageShell from '../../components/ManagerPageShell'
 import { apiClient } from '../../config/api'
 
@@ -23,27 +22,15 @@ interface ApiResponse<T> {
   message?: string
 }
 
-const EMPTY_FORM = {
-  gateName: '',
-  gateType: 'Entry',
-  floorId: '',
-}
-
 export default function ManagerGates() {
   const [gates, setGates] = useState<Gate[]>([])
   const [floors, setFloors] = useState<Floor[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Modal states
-  const [showModal, setShowModal] = useState(false)
-  const [editTarget, setEditTarget] = useState<Gate | null>(null)
-  const [form, setForm] = useState(EMPTY_FORM)
-  const [saving, setSaving] = useState(false)
   const [query, setQuery] = useState('')
   const [gateTypeFilter, setGateTypeFilter] = useState('all')
   const [floorFilter, setFloorFilter] = useState('all')
-  const [deleteTarget, setDeleteTarget] = useState<Gate | null>(null)
 
   // Load supporting floors list for the FloorId selector.
   const fetchFloors = async () => {
@@ -85,66 +72,6 @@ export default function ManagerGates() {
     return () => window.clearTimeout(loadTimer)
   }, [])
 
-  const openCreate = () => {
-    setEditTarget(null)
-    setForm(EMPTY_FORM)
-    setShowModal(true)
-  }
-
-  const openEdit = (g: Gate) => {
-    setEditTarget(g)
-    setForm({
-      gateName: g.gateName,
-      gateType: g.gateType,
-      floorId: g.floorId,
-    })
-    setShowModal(true)
-  }
-
-  const closeModal = () => {
-    setShowModal(false)
-    setEditTarget(null)
-    setForm(EMPTY_FORM)
-  }
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    try {
-      const payload = {
-        gateName: form.gateName.trim(),
-        gateType: form.gateType,
-        floorId: form.floorId,
-      }
-
-      if (editTarget) {
-        const body = {
-          gateId: editTarget.gateId,
-          ...payload,
-        }
-        await apiClient.put<ApiResponse<unknown>>('/Gate', body)
-      } else {
-        await apiClient.post<ApiResponse<unknown>>('/Gate', payload)
-      }
-
-      closeModal()
-      await fetchGates()
-    } catch (err: unknown) {
-      console.error(err)
-      alert(err instanceof Error ? err.message : 'Lưu thất bại. Vui lòng thử lại.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    const response = await apiClient.delete<ApiResponse<unknown>>(`/Gate/${deleteTarget.gateId}`)
-    if (!response.isSuccess) throw new Error(response.message ?? 'Không thể xóa cổng.')
-    setDeleteTarget(null)
-    await fetchGates()
-  }
-
   const normalizedQuery = query.trim().toLowerCase()
   const filteredGates = gates.filter((gate) => {
     const matchesQuery = !normalizedQuery ||
@@ -167,7 +94,7 @@ export default function ManagerGates() {
             <span className="manager-resource-icon manager-resource-icon--green"><DoorOpen size={24} aria-hidden /></span>
             <div><h2>Quản lý cổng ra vào</h2><p>Thiết lập cổng vào, cổng ra và vị trí tầng phục vụ vận hành bãi xe.</p></div>
           </div>
-          <div className="manager-header-actions"><button type="button" className="btn btn-outline" onClick={fetchGates} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} aria-hidden /> Làm mới</button><button type="button" className="btn btn-primary manager-add-button" onClick={openCreate}><Plus size={18} aria-hidden /> Thêm cổng</button></div>
+          <div className="manager-header-actions"><button type="button" className="btn btn-outline" onClick={fetchGates} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} aria-hidden /> Làm mới</button><span className="field-hint">Cổng được thêm và đổi tên trên sơ đồ ở mục Thiết kế bãi đỗ (admin).</span></div>
         </header>
 
         <section className="manager-summary-grid manager-summary-grid--three" aria-label="Tổng quan cổng ra vào">
@@ -213,7 +140,7 @@ export default function ManagerGates() {
                           </span>
                         </td>
                         <td>
-                          <div className="manager-row-actions"><button type="button" className="btn btn-outline btn-sm manager-edit-button" onClick={() => openEdit(g)}><Pencil size={15} aria-hidden /> Sửa</button><button type="button" className="btn btn-ghost btn-sm manager-danger-action" onClick={() => setDeleteTarget(g)}><Trash2 size={15} aria-hidden /> Xóa</button></div>
+                          
                         </td>
                       </tr>
                     ))
@@ -225,66 +152,6 @@ export default function ManagerGates() {
       </div>
 
       {/* Create / Edit Modal */}
-      {showModal && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeModal()
-          }}
-        >
-          <div className="modal-panel manager-form-modal" role="dialog" aria-modal="true" aria-labelledby="gate-modal-title">
-            <div className="manager-modal-header"><div><h3 id="gate-modal-title" className="modal-title">{editTarget ? 'Cập nhật cổng' : 'Thêm cổng mới'}</h3><p>Chọn đúng tầng và hướng di chuyển của cổng.</p></div><button type="button" className="btn btn-ghost btn-sm" aria-label="Đóng" onClick={closeModal} disabled={saving}><X size={20} aria-hidden /></button></div>
-            <form onSubmit={handleSave}>
-              <div className="form-field">
-                <label htmlFor="gate-name">Tên cổng *</label>
-                <input
-                  id="gate-name"
-                  type="text"
-                  required
-                  value={form.gateName}
-                  onChange={(e) => setForm({ ...form, gateName: e.target.value })}
-                  placeholder="VD: Cổng chính"
-                />
-              </div>
-              <div className="form-field">
-                <label htmlFor="gate-floor">Tầng *</label>
-                <select
-                  id="gate-floor"
-                  required
-                  value={form.floorId}
-                  onChange={(e) => setForm({ ...form, floorId: e.target.value })}
-                >
-                  <option value="" disabled>-- Chọn tầng --</option>
-                  {floors.map((floor) => (
-                    <option key={floor.floorId} value={floor.floorId}>{floor.floorName}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-field">
-                <label htmlFor="gate-type">Loại cổng *</label>
-                <select
-                  id="gate-type"
-                  required
-                  value={form.gateType}
-                  onChange={(e) => setForm({ ...form, gateType: e.target.value })}
-                >
-                  <option value="Entry">Cổng vào</option>
-                  <option value="Exit">Cổng ra</option>
-                </select>
-              </div>
-              <div className="form-actions">
-                <button type="button" className="btn btn-ghost" onClick={closeModal}>
-                  Hủy
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? 'Đang lưu...' : editTarget ? 'Lưu thay đổi' : 'Thêm cổng'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      <ManagerConfirmActionModal open={Boolean(deleteTarget)} title="Xóa cổng?" description={<>Bạn có chắc muốn xóa cổng <strong>{deleteTarget?.gateName}</strong>? Hành động này không thể hoàn tác.</>} targetLabel={deleteTarget?.gateName} targetMeta={deleteTarget ? `${deleteTarget.gateType === 'Entry' ? 'Cổng vào' : 'Cổng ra'} · ${deleteTarget.floorName || 'Chưa rõ tầng'}` : undefined} targetIcon={<DoorOpen size={18} aria-hidden />} note="Cổng đang được sử dụng trong phiên ra vào có thể không xóa được." errorFallback="Không thể xóa cổng." onCancel={() => setDeleteTarget(null)} onConfirm={handleDelete} />
     </ManagerPageShell>
   )
 }

@@ -9608,3 +9608,35 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .contract-check { display: flex; align-items: center; gap: 0.4rem; margin: 0.5rem 0 0; font-size: 0.86rem; }
 .contract-check--ok { color: #15803d; }
 .contract-check--bad { color: #b91c1c; }
+
+/* ===== Thiết kế bãi đỗ (admin) ===== */
+.designer-floor-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.designer-floor-tabs button { border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 0.4rem 0.9rem; font-weight: 600; color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; }
+.designer-floor-tabs button.active { border-color: #087b8c; background: #effbfc; color: #087b8c; }
+.designer-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr) auto; gap: 1rem; align-items: start; }
+.designer-panel { padding: 1rem; display: flex; flex-direction: column; gap: 0.6rem; min-width: 220px; }
+.designer-panel h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin: 0.4rem 0 0; }
+.designer-tools, .designer-palette { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.designer-tool, .designer-swatch { display: flex; align-items: center; gap: 0.4rem; border: 1px solid #e2e8f0; background: #fff; border-radius: 10px; padding: 0.45rem 0.5rem; font-size: 0.8rem; text-align: left; cursor: pointer; color: var(--text); min-height: 40px; }
+.designer-tool.active, .designer-swatch.active { border-color: #087b8c; background: #effbfc; color: #087b8c; }
+.designer-tool:disabled { opacity: 0.5; cursor: not-allowed; }
+.designer-swatch span { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: #fff; flex: none; }
+.designer-field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; font-weight: 600; color: var(--text); }
+.designer-field input, .designer-field select { padding: 0.4rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; font-weight: 500; }
+.designer-canvas-panel { padding: 0.75rem; min-width: 0; }
+.designer-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem; font-size: 0.8rem; }
+.designer-toolbar label { display: inline-flex; align-items: center; gap: 0.3rem; }
+.designer-toolbar input[type='number'] { width: 56px; padding: 0.25rem; border: 1px solid #cbd5e1; border-radius: 6px; }
+.designer-upload { cursor: pointer; }
+.designer-spacer { flex: 1; }
+.designer-warning { color: #dc2626; font-weight: 600; }
+.designer-scroll { overflow: auto; max-height: 70vh; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; touch-action: none; }
+.designer-stage { position: relative; width: max-content; }
+.designer-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+.designer-grid { display: grid; position: relative; width: max-content; user-select: none; }
+.designer-cell { border-right: 1px solid rgba(148, 163, 184, 0.35); border-bottom: 1px solid rgba(148, 163, 184, 0.35); display: grid; place-items: center; font-weight: 700; color: #0f172a; overflow: hidden; white-space: nowrap; cursor: crosshair; line-height: 1; }
+.designer-cell.t-gate, .designer-cell.t-wall, .designer-cell.t-kiosk, .designer-cell.t-slot { color: #fff; }
+.designer-cell.stuck { outline: 2px solid #dc2626; outline-offset: -2px; }
+.designer-cell.selected { outline: 3px solid #0f172a; outline-offset: -3px; }
+.designer-cell.in-rect { box-shadow: inset 0 0 0 999px rgba(8, 123, 140, 0.25); }
+@media (max-width: 1100px) { .designer-layout { grid-template-columns: 1fr; } }

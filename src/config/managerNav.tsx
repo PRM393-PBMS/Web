@@ -14,6 +14,8 @@ import {
   AlertTriangle,
   Building2,
   Wallet,
+  TicketPercent,
+  FileText,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -130,6 +132,20 @@ export const MANAGER_NAV: NavItem[] = [
     path: '/manager/wallets',
     icon: <Wallet size={18} />,
     desc: 'Cộng hoặc thu hồi tiền khuyến mãi trong ví khách',
+  },
+  {
+    id: 'promo-codes',
+    label: 'Mã khuyến mãi',
+    path: '/manager/promo-codes',
+    icon: <TicketPercent size={18} />,
+    desc: 'Mã nạp ví: nạp đủ mức tặng tiền khuyến mãi',
+  },
+  {
+    id: 'invoice-requests',
+    label: 'Xuất hoá đơn GTGT',
+    path: '/manager/invoice-requests',
+    icon: <FileText size={18} />,
+    desc: 'Yêu cầu xuất hoá đơn đỏ của khách công ty',
   },
 ]
 

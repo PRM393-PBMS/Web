@@ -1,4 +1,4 @@
-import { BarChart3, LayoutDashboard, Shield, Users, Wallet } from 'lucide-react'
+import { BarChart3, LayoutDashboard, Map, Shield, Users, Wallet } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 export interface NavItem {
@@ -44,6 +44,13 @@ export const ADMIN_NAV: NavItem[] = [
     path: '/admin/wallets',
     icon: <Wallet size={18} />,
     desc: 'Cộng hoặc thu hồi tiền khuyến mãi trong ví khách',
+  },
+  {
+    id: 'lot-designer',
+    label: 'Thiết kế bãi đỗ',
+    path: '/admin/lot-designer',
+    icon: <Map size={18} />,
+    desc: 'Tạo bãi, thêm tầng, vẽ sơ đồ ô đỗ, lối đi, cổng',
   },
 ]
 
