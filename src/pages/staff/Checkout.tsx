@@ -139,8 +139,10 @@ export default function Checkout() {
   const [checkoutResult, setCheckoutResult] = useState<ParkingCheckOutResponse | null>(null)
   const [checkoutPayment, setCheckoutPayment] = useState<ParkingCheckoutPayment | null>(null)
   const checkoutPaymentId = checkoutPayment?.paymentId
-  const checkoutPaymentMethod = checkoutPayment?.paymentMethod
   const checkoutPaymentStatus = checkoutPayment?.paymentStatus
+  /** Lần cuối khung "Tình trạng giao dịch" hỏi máy chủ; lỗi khi lần hỏi gần nhất thất bại. */
+  const [paymentCheckedAt, setPaymentCheckedAt] = useState<Date | null>(null)
+  const [paymentCheckFailed, setPaymentCheckFailed] = useState(false)
 
   const showMessage = (text: string, tone: 'success' | 'error' = 'error') => {
     setMessageTone(tone)
@@ -271,24 +273,26 @@ export default function Checkout() {
     }
   }, [gateContext, qrPayload, sessionId, plateLookup])
 
+  // Giao dịch còn chờ thì hỏi trạng thái mỗi 2 giây; đã thanh toán hoặc thất bại thì ngừng.
   useEffect(() => {
-    if (
-      !checkoutPaymentId ||
-      checkoutPaymentMethod?.toLowerCase() !== 'payos' ||
-      checkoutPaymentStatus?.toLowerCase() !== 'pending'
-    ) return
+    if (!checkoutPaymentId || checkoutPaymentStatus?.toLowerCase() !== 'pending') return
 
     let stopped = false
     const refreshStatus = async () => {
       try {
         const res = await parkingOperationApi.getCheckoutPaymentStatus(checkoutPaymentId)
-        if (stopped || !res.isSuccess || !res.result) return
-
-        const nextPayment = getCheckoutPayment(res.result)
-        if (!nextPayment) return
+        if (stopped) return
+        const nextPayment = res.isSuccess && res.result ? getCheckoutPayment(res.result) : null
+        if (!nextPayment) {
+          setPaymentCheckFailed(true)
+          return
+        }
+        setPaymentCheckedAt(new Date())
+        setPaymentCheckFailed(false)
         setCheckoutPayment(nextPayment)
         setCheckoutResult((current) => ({ ...current, ...res.result }))
 
+        const payos = nextPayment.paymentMethod.toLowerCase() === 'payos'
         const status = nextPayment.paymentStatus.toLowerCase()
         if (status === 'success') {
           void markScanStatus(mobileScanId)
@@ -296,13 +300,19 @@ export default function Checkout() {
           setOnlinePayment(null)
           setPlateRecognitionNotice('')
           setPlateRecognitionTone('error')
-          showMessage('Thanh toán PayOS thành công. Checkout đã hoàn tất và xe có thể rời bãi.', 'success')
+          showMessage(
+            payos
+              ? 'Thanh toán PayOS thành công. Checkout đã hoàn tất và xe có thể rời bãi.'
+              : 'Đã ghi nhận thanh toán. Checkout đã hoàn tất và xe có thể rời bãi.',
+            'success',
+          )
         } else if (status === 'failed') {
           setOnlinePayment(null)
-          showMessage('Thanh toán PayOS thất bại hoặc đã bị hủy. Phiên gửi xe vẫn đang hoạt động.')
+          showMessage('Thanh toán thất bại hoặc đã bị hủy. Phiên gửi xe vẫn đang hoạt động.')
         }
       } catch {
         // Webhook có thể đến chậm; lần kiểm tra kế tiếp sẽ thử lại.
+        if (!stopped) setPaymentCheckFailed(true)
       }
     }
 
@@ -312,7 +322,7 @@ export default function Checkout() {
       stopped = true
       window.clearInterval(timer)
     }
-  }, [checkoutPaymentId, checkoutPaymentMethod, checkoutPaymentStatus, markScanStatus, mobileScanId, clearMobileScan])
+  }, [checkoutPaymentId, checkoutPaymentStatus, markScanStatus, mobileScanId, clearMobileScan])
 
   const setPlateForCheckout = (plate: string) => {
     const nextPlate = normalizeLicensePlate(plate)
@@ -322,6 +332,13 @@ export default function Checkout() {
 
   const preparePlateForCheckout = (plate: string) => {
     setPlateForCheckout(plate)
+  }
+
+  /** Có biển số mà chưa có phiên (chụp ảnh, lượt quét không kèm phiên): tìm xe đang gửi theo biển số. */
+  const lookupSessionByPlate = (plate: string) => {
+    if (!plate.trim() || sessionId || sessionForCheckout) return
+    setQrPayload('')
+    setPlateLookup(plate)
   }
 
   const handlePlateCameraCapture = async (file: File, previewUrl: string) => {
@@ -362,6 +379,7 @@ export default function Checkout() {
               feedback.ok ? 'Nhận diện biển số thành công.' : feedback.message,
             )
           }
+          lookupSessionByPlate(recognizedPlate)
         }
       } else {
         setPlateRecognitionTone('error')
@@ -656,6 +674,9 @@ export default function Checkout() {
   )
 
   const resetCheckout = (keepVehicleData = false) => {
+    setPaymentCheckedAt(null)
+    setPaymentCheckFailed(false)
+    setPlateLookup('')
     setCheckoutPayment(null)
     setCheckoutResult(null)
     setOnlinePayment(null)
@@ -689,8 +710,10 @@ export default function Checkout() {
     setImagePreviewUrl(scan.imageUrl)
     setExitImageUrl(scan.imageUrl)
     preparePlateForCheckout(scan.licensePlate ?? '')
+    // resetCheckout() vừa xoá phiên cũ; chưa render lại nên không dùng lookupSessionByPlate (đọc state cũ).
     const activeSessionId = scan.match?.activeSession?.sessionId
     if (activeSessionId) setSessionId(activeSessionId)
+    else if (scan.licensePlate) setPlateLookup(scan.licensePlate)
     setPlateRecognitionTone(scan.licensePlate ? 'success' : 'error')
     setPlateRecognitionNotice(
       scan.plateSource === 'web'
@@ -712,8 +735,13 @@ export default function Checkout() {
           ? 'Web tự đọc biển số từ ảnh. Đối chiếu với ảnh, kiểm tra xe và phí trước khi checkout.'
           : 'Đã nhận biển số từ điện thoại. Kiểm tra xe và phí trước khi checkout.',
       )
+      lookupSessionByPlate(plate)
     },
-    idle: Boolean(gateId) && !loading && !uploading && !qrUploading && !driverUploading && !validatingFloor && !hasPendingCheckout,
+    // Form đã có xe (mở từ "Xe đang đỗ", vé QR, ảnh tự chụp) thì lượt quét mới chờ trong danh sách,
+    // không tự đè lên làm mất phiên đang đối chiếu.
+    idle:
+      Boolean(gateId) && !loading && !uploading && !qrUploading && !driverUploading && !validatingFloor && !hasPendingCheckout &&
+      (Boolean(realtime.selectedScan) || (!sessionId && !sessionForCheckout && !plateLookup && !licensePlate.trim())),
     plateEmpty: !licensePlate.trim(),
   })
 
@@ -1098,6 +1126,45 @@ export default function Checkout() {
                   </p>
                   )}
 
+                {checkoutPayment && (
+                  <section
+                    className={`checkout-transaction is-${checkoutSucceeded ? 'success' : checkoutFailed ? 'failed' : 'pending'}`}
+                    aria-live="polite"
+                  >
+                    <div className="checkout-transaction-head">
+                      <strong>Tình trạng giao dịch</strong>
+                      <span className="checkout-transaction-badge">
+                        {checkoutSucceeded ? (
+                          <><CheckCircle2 size={14} aria-hidden /> Đã thanh toán</>
+                        ) : checkoutFailed ? (
+                          <><XCircle size={14} aria-hidden /> Thất bại / đã hủy</>
+                        ) : (
+                          <><Clock3 size={14} aria-hidden /> Chờ thanh toán</>
+                        )}
+                      </span>
+                    </div>
+                    <dl className="checkout-transaction-info">
+                      <div><dt>Số tiền</dt><dd>{formatCurrency(checkoutPayment.amount)}</dd></div>
+                      <div><dt>Phương thức</dt><dd>{checkoutPayment.paymentMethod.toLowerCase() === 'cash' ? 'Tiền mặt' : checkoutPayment.paymentMethod}</dd></div>
+                      {checkoutPayment.transactionReference && (
+                        <div><dt>Mã giao dịch</dt><dd>{checkoutPayment.transactionReference}</dd></div>
+                      )}
+                    </dl>
+                    <small className="checkout-transaction-poll">
+                      {hasPendingCheckout ? (
+                        <>
+                          <span className="checkout-transaction-dot" aria-hidden />
+                          {paymentCheckFailed
+                            ? 'Chưa kiểm tra được, đang thử lại...'
+                            : `Tự kiểm tra mỗi 2 giây${paymentCheckedAt ? ` · lần cuối ${paymentCheckedAt.toLocaleTimeString('vi-VN')}` : ''}`}
+                        </>
+                      ) : (
+                        'Đã ngừng kiểm tra.'
+                      )}
+                    </small>
+                  </section>
+                )}
+
                 {getOnlinePaymentUrl(onlinePayment) && (
                   <div className="scan-result checkout-online-payment">
                     <h3>Thanh toán PayOS</h3>
@@ -1109,7 +1176,6 @@ export default function Checkout() {
                       />
                     )}
                     <div className="scan-info">
-                      <p><strong>Trạng thái:</strong> {checkoutPayment?.paymentStatus || 'Pending'}</p>
                       <p><strong>OrderCode:</strong> {getOnlinePaymentOrderCode(onlinePayment) || 'Chưa có'}</p>
                       <p><strong>PaymentLinkId:</strong> {getOnlinePaymentLinkId(onlinePayment) || 'Chưa có'}</p>
                     </div>
@@ -1188,11 +1254,6 @@ export default function Checkout() {
                       <p><strong>Phí tạm tính:</strong> Quét vé để xem phí trước khi thanh toán</p>
                     )}
                     <p><strong>Phương thức thanh toán:</strong> {checkOutType === 'resident' ? 'Gói tháng' : paymentMethod}</p>
-                    {checkoutPayment && (
-                      <p>
-                        <strong>Trạng thái thanh toán:</strong> {checkoutPayment.paymentStatus}
-                      </p>
-                    )}
                   </div>
                   <div className="checkout-readiness">
                     <span className={sessionForCheckout ? 'done' : ''}>
