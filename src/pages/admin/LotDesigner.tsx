@@ -148,6 +148,9 @@ export default function LotDesigner() {
       setVehicleTypes(types)
       setVehicleTypeId((cur) => cur || types.find((t) => !/máy/i.test(t.typeName))?.vehicleTypeId || types[0]?.vehicleTypeId || '')
       setLotId((cur) => cur || (Array.isArray(p) && p[0]?.id) || '')
+      if (!f.isSuccess || !v.isSuccess) {
+        setMessage({ tone: 'error', text: (!f.isSuccess ? f.message : v.message) || 'Không tải được danh sách tầng hoặc loại xe.' })
+      }
     } catch (error) {
       setMessage({ tone: 'error', text: errorMessage(error, 'Không tải được danh sách bãi.') })
     }

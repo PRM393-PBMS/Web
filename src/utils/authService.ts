@@ -1,5 +1,5 @@
 // Authentication Service
-import { apiClient, API_ENDPOINTS, type ApiClient } from '../config/api'
+import { apiClient, apiErrorMessage, API_ENDPOINTS, type ApiClient } from '../config/api'
 
 export interface LoginRequest {
   email: string
@@ -95,7 +95,7 @@ export class AuthService {
     } catch (error) {
       console.error('Login error:', error)
       // Return error response instead of throwing
-      const errorMessage = error instanceof Error ? error.message : 'Login failed'
+      const errorMessage = apiErrorMessage(error, 'Máy chủ trả dữ liệu đăng nhập không hợp lệ. Vui lòng thử lại.')
       return {
         statusCode: 400,
         message: errorMessage,

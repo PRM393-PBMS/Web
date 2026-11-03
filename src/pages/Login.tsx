@@ -2,6 +2,7 @@ import { AlertCircle, LogIn, Eye, EyeOff } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { roleHome } from '../utils/roleHome'
 
 const LOGO_SRC = '/image/logo.png'
 
@@ -15,11 +16,9 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
 
-  const homeOf = (role?: string) =>
-    role === 'staff' ? '/staff/dashboard' : role === 'manager' ? '/manager/dashboard' : '/admin/dashboard'
   // Chỉ quay lại trang cũ nếu trang đó thuộc khu của vai trò đang đăng nhập.
   const destinationFor = (role?: string) =>
-    returnTo && role && returnTo.startsWith(`/${role}/`) ? returnTo : homeOf(role)
+    returnTo && role && returnTo.startsWith(`/${role}/`) ? returnTo : roleHome(role)
 
   if (isAuthenticated && user) {
     return <Navigate to={destinationFor(user.role)} replace />

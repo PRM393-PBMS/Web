@@ -19,6 +19,7 @@ import {
   type ReservationDto,
 } from '../../utils/apiServices'
 import { formatUtcToVietnamDateTime, parseBackendUtcDate, toVietnamDateInput } from '../../utils/dateTime'
+import { failureOf } from '../../utils/apiResult'
 
 const ACTIVE_RESERVATION_STATUSES = ['pending', 'confirmed', 'modified']
 /** Tự làm mới khi màn hình để mở cả ca trực. */
@@ -57,9 +58,11 @@ export default function StaffDashboard() {
       setIncidents([])
     }
 
-    if (reservationResult.status === 'rejected' && sessionResult.status === 'rejected') {
-      setError('Không thể tải dữ liệu vận hành. Vui lòng kiểm tra kết nối backend.')
-    }
+    const failure =
+      failureOf(sessionResult, 'Không tải được danh sách xe trong bãi.') ??
+      failureOf(reservationResult, 'Không tải được danh sách đặt chỗ.') ??
+      failureOf(incidentResult, 'Không tải được danh sách sự cố.')
+    if (failure) setError(`Số liệu bên dưới có thể chưa đầy đủ: ${failure}`)
     setLoading(false)
   }, [])
 

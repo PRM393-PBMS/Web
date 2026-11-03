@@ -1,3 +1,4 @@
+import { failureOf } from "../../utils/apiResult";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -136,6 +137,14 @@ export default function Exception() {
     } else {
       setSessions([]);
     }
+    const notFound =
+      incidentResult.status === "rejected" &&
+      incidentResult.reason instanceof ApiRequestError &&
+      incidentResult.reason.statusCode === 404;
+    const failure =
+      (notFound ? null : failureOf(incidentResult, "Không thể tải danh sách sự cố.")) ??
+      failureOf(sessionResult, "Không thể tải danh sách xe trong bãi.");
+    if (failure) setError(failure);
     setLoading(false);
   }, []);
 

@@ -1,3 +1,4 @@
+import { apiErrorMessage } from "../../config/api";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -350,6 +351,10 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
           .map((gate) => gate.gateId),
       );
       setGates(gateRes.isSuccess ? gateRes.result ?? [] : []);
+      const failed = [sessionRes, reservationRes, gateRes].find((res) => !res.isSuccess);
+      if (failed) {
+        setListError(failed.message || "Chưa tải được danh sách. Vui lòng thử lại.");
+      }
 
       if (reservationRes.isSuccess && reservationRes.result) {
         setReservations(
@@ -403,9 +408,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
       }
     } catch (err) {
       console.error(err);
-      setListError(
-        "Chưa tải được danh sách từ API. Vui lòng kiểm tra quyền staff hoặc backend.",
-      );
+      setListError(apiErrorMessage(err, "Chưa tải được danh sách. Vui lòng thử lại."));
     } finally {
       setListLoading(false);
     }

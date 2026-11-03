@@ -36,6 +36,32 @@ export const API_ENDPOINTS = {
   ROLES_DELETE: '/Role',
 }
 
+/** Thông báo cho người dùng thay cho lỗi kỹ thuật của trình duyệt ("Failed to fetch", "Unexpected end of JSON input"). */
+export const NETWORK_ERROR_MESSAGE = 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.'
+export const BAD_RESPONSE_MESSAGE = 'Máy chủ trả dữ liệu không hợp lệ. Vui lòng thử lại sau.'
+
+/** Lỗi khi gọi API mà không có lý do từ máy chủ (lỗi JS, dữ liệu sai dạng): không hiện lỗi kỹ thuật cho người dùng. */
+export function apiErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof ApiRequestError && error.message ? error.message : fallback
+}
+
+async function readJson<T>(response: Response): Promise<T> {
+  try {
+    return (await response.json()) as T
+  } catch (error) {
+    throw new ApiRequestError(response.status, BAD_RESPONSE_MESSAGE, error)
+  }
+}
+
+async function send(url: string, options: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, options)
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    throw new ApiRequestError(0, NETWORK_ERROR_MESSAGE, error)
+  }
+}
+
 export class ApiRequestError extends Error {
   statusCode: number
   data: unknown
@@ -115,7 +141,7 @@ export class ApiClient {
 
     this.refreshPromise = (async () => {
       try {
-        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.AUTH_REFRESH}`, {
+        const response = await send(`${this.baseUrl}${API_ENDPOINTS.AUTH_REFRESH}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -196,7 +222,7 @@ export class ApiClient {
     }
 
     try {
-      const response = await fetch(url, options)
+      const response = await send(url, options)
 
       // Only 401 means the access token needs refreshing. A 403 is an
       // authorization failure and must be returned to the caller unchanged.
@@ -216,11 +242,11 @@ export class ApiClient {
       if (!response.ok) {
         const contentType = response.headers.get('content-type')
         if (response.status === 422 && contentType?.includes('application/json')) {
-          return (await response.json()) as T
+          return readJson<T>(response)
         }
 
         if (contentType?.includes('application/json')) {
-          const errorBody = await response.json()
+          const errorBody = await readJson<{ message?: unknown }>(response)
           // Lỗi kiểm tra dữ liệu của NestJS trả `message` là mảng.
           const message =
             typeof errorBody?.message === 'string'
@@ -237,7 +263,7 @@ export class ApiClient {
 
       const contentType = response.headers.get('content-type')
       if (contentType?.includes('application/json')) {
-        return (await response.json()) as T
+        return readJson<T>(response)
       }
 
       return response.text() as unknown as T
@@ -296,15 +322,16 @@ export class ApiClient {
   }
 
   async download(endpoint: string, _isRetry = false): Promise<{ blob: Blob; fileName: string }> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, { method: 'GET', headers: this.getHeaders() })
+    const response = await send(`${this.baseUrl}${endpoint}`, { method: 'GET', headers: this.getHeaders() })
     if (response.status === 401 && !_isRetry) {
       const token = await this.refreshAccessToken()
       if (token) return this.download(endpoint, true)
     }
     if (!response.ok) {
       const contentType = response.headers.get('content-type')
-      const body = contentType?.includes('application/json') ? await response.json() : await response.text()
-      const message = typeof body?.message === 'string' ? body.message : `HTTP ${response.status}`
+      const body: unknown = contentType?.includes('application/json') ? await readJson<unknown>(response) : await response.text()
+      const raw = (body as { message?: unknown } | null)?.message
+      const message = typeof raw === 'string' ? raw : `HTTP ${response.status}`
       throw new ApiRequestError(response.status, message, body)
     }
     const disposition = response.headers.get('content-disposition') ?? ''
