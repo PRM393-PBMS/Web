@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import ManagerConfirmActionModal from '../../components/ManagerConfirmActionModal'
 import ManagerPageShell from '../../components/ManagerPageShell'
-import { apiClient } from '../../config/api'
+import { apiClient, apiErrorMessage } from '../../config/api'
 import { useParkingFeePreviews } from '../../hooks/useParkingFeePreviews'
 import {
   formatUtcToVietnamDate,
@@ -185,7 +185,7 @@ export default function ManagerParkingSessions() {
         setGateOptions((gates.result ?? []).map((item) => ({ id: item.gateId, label: item.gateName, type: item.gateType })))
         setSlotOptions((slots.result ?? []).map((item) => ({ id: item.slotId, label: item.slotCode, type: item.status })))
         setSubscriptions(monthlySubscriptions.result ?? [])
-      }).catch(() => setError('Không thể tải loại xe, cổng hoặc slot để chỉnh sửa phiên.'))
+      }).catch((requestError) => setError(apiErrorMessage(requestError, 'Không thể tải loại xe, cổng hoặc slot để chỉnh sửa phiên.')))
     })
   }, [fetchSessions])
 

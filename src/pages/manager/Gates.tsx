@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { DoorOpen, Layers3, LogIn, LogOut, RefreshCw, Search, X } from 'lucide-react'
 import ManagerPageShell from '../../components/ManagerPageShell'
-import { apiClient } from '../../config/api'
+import { apiClient, apiErrorMessage } from '../../config/api'
 
 interface Gate {
   gateId: string
@@ -53,11 +53,11 @@ export default function ManagerGates() {
       if (res.isSuccess && res.result) {
         setGates(res.result)
       } else {
-        setError('Không thể tải danh sách cổng.')
+        setError(res.message || 'Không thể tải danh sách cổng.')
       }
     } catch (err: unknown) {
       console.error(err)
-      setError('Không thể tải danh sách cổng.')
+      setError(apiErrorMessage(err, 'Không thể tải danh sách cổng.'))
     } finally {
       setLoading(false)
     }

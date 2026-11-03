@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
+import ErrorBoundary from "./components/ErrorBoundary";
 import Layout from "./components/Layout";
 
 import { AuthProvider } from "./context/AuthContext";
@@ -54,6 +55,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <ErrorBoundary>
         <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route element={<Layout />}>
@@ -102,10 +104,11 @@ export default function App() {
               <Route path="manager/promo-codes" element={<ManagerPromoCodes />} />
               <Route path="manager/invoice-requests" element={<ManagerInvoiceRequests />} />
 
-              <Route path="*" element={<Navigate to="dang-nhap" replace />} />
+              <Route path="*" element={<Navigate to="/dang-nhap" replace />} />
             </Route>
           </Routes>
         </Suspense>
+        </ErrorBoundary>
       </BrowserRouter>
     </AuthProvider>
   );

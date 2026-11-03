@@ -23,6 +23,7 @@ import {
   type StaffGateOperation,
 } from '../../utils/staffGateContext'
 import { gateScanApi } from '../../utils/gateScans'
+import { apiErrorMessage } from '../../config/api'
 
 export default function StaffGateSelection() {
   const navigate = useNavigate()
@@ -53,6 +54,12 @@ export default function StaffGateSelection() {
       setError('')
       Promise.all([floorApi.getAll(), gateApi.getAll()])
         .then(([floorResponse, gateResponse]) => {
+          if (!floorResponse.isSuccess || !gateResponse.isSuccess) {
+            setError(
+              (!floorResponse.isSuccess ? floorResponse.message : gateResponse.message) ||
+                'Không thể tải cấu hình tầng và cổng. Vui lòng thử lại.',
+            )
+          }
           const nextFloors = floorResponse.isSuccess ? floorResponse.result ?? [] : []
           const nextGates = gateResponse.isSuccess
             ? (gateResponse.result ?? []).filter(
@@ -61,11 +68,11 @@ export default function StaffGateSelection() {
             : []
           setFloors(nextFloors)
           setGates(nextGates)
-          if (nextFloors.length === 0) setError('Chưa có tầng nào được cấu hình.')
+          if (floorResponse.isSuccess && nextFloors.length === 0) setError('Chưa có tầng nào được cấu hình.')
         })
         .catch((requestError) => {
           console.error(requestError)
-          setError('Không thể tải cấu hình tầng và cổng. Vui lòng thử lại.')
+          setError(apiErrorMessage(requestError, 'Không thể tải cấu hình tầng và cổng. Vui lòng thử lại.'))
         })
         .finally(() => setLoading(false))
     })

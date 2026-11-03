@@ -1,4 +1,4 @@
-import { apiClient, rootApiClient } from '../config/api'
+import { apiClient, ApiRequestError, BAD_RESPONSE_MESSAGE, rootApiClient } from '../config/api'
 
 export interface ApiResponse<T = unknown> {
   statusCode: number
@@ -491,7 +491,13 @@ export interface ParkingInput {
 
 /** Bãi đỗ nằm ở /parkings (không có tiền tố /api) và trả thẳng dữ liệu, lỗi theo mã HTTP. */
 export const parkingApi = {
-  getAll: () => rootApiClient.get<ParkingDto[]>('/parkings'),
+  // /parkings trả mảng thô; trả thứ khác (lỗi bọc phong bì, null) thì báo lỗi thay vì để trang gọi .filter rồi sập.
+  getAll: async () => {
+    const list = await rootApiClient.get<unknown>('/parkings')
+    if (Array.isArray(list)) return list as ParkingDto[]
+    const message = (list as { message?: unknown } | null)?.message
+    throw new ApiRequestError(200, typeof message === 'string' && message ? message : BAD_RESPONSE_MESSAGE, list)
+  },
   create: (data: ParkingInput) => rootApiClient.post<ParkingDto>('/parkings', data),
   update: (id: string, data: ParkingInput) => rootApiClient.patch<ParkingDto>(`/parkings/${id}`, data),
   remove: (id: string) => rootApiClient.delete<ParkingDto>(`/parkings/${id}`),

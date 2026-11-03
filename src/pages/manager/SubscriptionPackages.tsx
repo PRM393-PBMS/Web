@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { CalendarDays, CarFront, MapPin, Package, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import ManagerConfirmActionModal from '../../components/ManagerConfirmActionModal'
 import ManagerPageShell from '../../components/ManagerPageShell'
-import { apiClient } from '../../config/api'
+import { apiClient, apiErrorMessage } from '../../config/api'
 import { formatCurrency } from '../../utils/pricing'
 
 interface SubscriptionPackage {
@@ -73,13 +73,13 @@ export default function ManagerSubscriptionPackages() {
     try {
       const res = await apiClient.get<ApiResponse<SubscriptionPackage[]>>('/SubscriptionPackage')
       if (res.isSuccess) {
-        setPackages(res.result)
+        setPackages(res.result ?? [])
       } else {
         setError(res.message ?? 'Không thể tải danh sách gói thuê bao.')
       }
     } catch (e) {
       console.error(e)
-      setError('Không thể tải danh sách gói thuê bao.')
+      setError(apiErrorMessage(e, 'Không thể tải danh sách gói thuê bao.'))
     } finally {
       setLoading(false)
     }
@@ -88,11 +88,11 @@ export default function ManagerSubscriptionPackages() {
   const fetchVehicleTypes = async () => {
     try {
       const res = await apiClient.get<ApiResponse<VehicleType[]>>('/VehicleType')
-      if (res.isSuccess) setVehicleTypes(res.result)
+      if (res.isSuccess) setVehicleTypes(res.result ?? [])
       else setError(res.message ?? 'Không thể tải danh sách loại phương tiện.')
     } catch (e) {
       console.error(e)
-      setError('Không thể tải danh sách loại phương tiện.')
+      setError(apiErrorMessage(e, 'Không thể tải danh sách loại phương tiện.'))
     }
   }
 

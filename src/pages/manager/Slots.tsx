@@ -88,7 +88,7 @@ export default function ManagerSlots() {
     try {
       const res = await apiClient.get<ApiResponse<ParkingSlot[]>>('/ParkingSlot')
       if (res.isSuccess) {
-        setSlots(res.result)
+        setSlots(res.result ?? [])
       } else {
         setError(res.message ?? 'Không thể tải danh sách slot.')
       }

@@ -74,11 +74,16 @@ function profileKey(email: string) {
 function loadProfile(email: string, name: string): UserProfile {
   const saved = localStorage.getItem(profileKey(email));
   if (saved) {
-    const profile = JSON.parse(saved) as UserProfile;
-    return {
-      ...profile,
-      vehiclePlate: normalizeLicensePlate(profile.vehiclePlate),
-    };
+    // Hồ sơ lưu trên máy có thể hỏng (sửa tay, bản cũ): bỏ đi thay vì làm sập web lúc mở.
+    try {
+      const profile = JSON.parse(saved) as UserProfile;
+      return {
+        ...profile,
+        vehiclePlate: normalizeLicensePlate(profile.vehiclePlate),
+      };
+    } catch {
+      localStorage.removeItem(profileKey(email));
+    }
   }
   return {
     email,
@@ -91,8 +96,13 @@ function loadProfile(email: string, name: string): UserProfile {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => {
-    const storedUser = authService.getStoredUser();
-    return storedUser as AuthUser | null
+    const storedUser = authService.getStoredUser() as AuthUser | null;
+    // Phiên mang vai trò không dùng web (khách, vai trò lạ): coi như chưa đăng nhập, tránh chuyển trang qua lại.
+    if (storedUser && !WEB_ROLES.includes(storedUser.role)) {
+      sessionStorage.clear();
+      return null;
+    }
+    return storedUser;
   });
 
   const [profile, setProfile] = useState<UserProfile | null>(() =>
