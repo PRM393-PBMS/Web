@@ -9640,3 +9640,79 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .designer-cell.selected { outline: 3px solid #0f172a; outline-offset: -3px; }
 .designer-cell.in-rect { box-shadow: inset 0 0 0 999px rgba(8, 123, 140, 0.25); }
 @media (max-width: 1100px) { .designer-layout { grid-template-columns: 1fr; } }
+
+/* Sổ quỹ tiền mặt (quản lý) và tiền mặt đang giữ (nhân viên). */
+.cash-section-title {
+  margin: 0;
+  padding: 1rem 1.25rem 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cash-section-title small {
+  font-weight: 500;
+  color: #64748b;
+}
+
+.cash-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-right: 1.25rem;
+}
+
+.cash-period-label {
+  margin: 0 0 0.75rem;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.cash-amount-col {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.cash-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.cash-breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.cash-review-hint {
+  margin: 0 0 0.75rem;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.btn.cash-danger-btn {
+  border-color: #dc2626;
+  background: #dc2626;
+}
+
+.btn.cash-danger-btn:hover:not(:disabled) {
+  border-color: #b91c1c;
+  background: #b91c1c;
+}
+
+@media (max-width: 760px) {
+  .cash-breakdown-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Bảng tiền mặt: cột 2 là số tiền hoặc biển số, không ẩn như bảng quản lý khác trên điện thoại. */
+@media (max-width: 640px) {
+  .manager-resource-table.cash-table th:nth-child(2),
+  .manager-resource-table.cash-table td:nth-child(2) {
+    display: table-cell;
+  }
+}

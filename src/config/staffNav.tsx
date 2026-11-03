@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Banknote,
   CalendarCheck2,
   CarFront,
   Gauge,
@@ -23,6 +24,7 @@ export const STAFF_NAV: StaffNavItem[] = [
   { id: 'reservations', label: 'Đơn đặt trước', path: '/staff/reservations', icon: <CalendarCheck2 size={18} />, desc: 'Tra cứu khách có lịch hẹn', state: { activePanel: 'reservations' } },
   { id: 'active-vehicles', label: 'Xe trong bãi', path: '/staff/active-vehicles', icon: <CarFront size={18} />, desc: 'Tra cứu phiên đang hoạt động', state: { activePanel: 'active-vehicles' } },
   { id: 'checkout', label: 'Checkout tại cổng', path: '/staff/chon-cong/checkout', icon: <LogOut size={18} />, desc: 'Chọn tầng, cổng rồi xác nhận xe ra' },
+  { id: 'cash', label: 'Tiền mặt đang giữ', path: '/staff/cash', icon: <Banknote size={18} />, desc: 'Tiền thu khi checkout, chốt nộp cuối ca' },
   { id: 'exception', label: 'Xử lý sự cố', path: '/staff/exception', icon: <AlertTriangle size={18} />, desc: 'Tiếp nhận và đóng sự cố' },
 ]
 

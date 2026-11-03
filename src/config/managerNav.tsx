@@ -1,4 +1,5 @@
 import {
+  Banknote,
   BarChart3,
   Car,
   Clock,
@@ -90,6 +91,13 @@ export const MANAGER_NAV: NavItem[] = [
     path: '/manager/monthly-subscriptions',
     icon: <CalendarRange size={18} />,
     desc: 'Quản lý các gói tháng khách hàng đã đăng ký',
+  },
+  {
+    id: 'cash-ledger',
+    label: 'Sổ quỹ tiền mặt',
+    path: '/manager/cash-ledger',
+    icon: <Banknote size={18} />,
+    desc: 'Tiền mặt theo tuần, tháng; nhận tiền nhân viên nộp',
   },
   {
     id: 'payments',

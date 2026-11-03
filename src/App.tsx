@@ -14,6 +14,7 @@ const StaffScanPlate = lazy(() => import("./pages/staff/ScanPlate"));
 const StaffCheckout = lazy(() => import("./pages/staff/Checkout"));
 const StaffGateSelection = lazy(() => import("./pages/staff/GateSelection"));
 const StaffException = lazy(() => import("./pages/staff/Exception"));
+const StaffCashHolding = lazy(() => import("./pages/staff/CashHolding"));
 
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 const AdminUsers = lazy(() => import("./pages/admin/Users"));
@@ -37,6 +38,7 @@ const ManagerMonthlySubscriptions = lazy(() => import("./pages/manager/MonthlySu
 const ManagerParkingSessions = lazy(() => import("./pages/manager/ParkingSessions"));
 const ManagerReservations = lazy(() => import("./pages/manager/Reservations"));
 const ManagerPayments = lazy(() => import("./pages/manager/Payments"));
+const ManagerCashLedger = lazy(() => import("./pages/manager/CashLedger"));
 const ManagerVehicleChangeRequests = lazy(() => import("./pages/manager/VehicleChangeRequests"));
 const ManagerIncidents = lazy(() => import("./pages/manager/Incidents"));
 const ManagerWallets = lazy(() => import("./pages/manager/Wallets"));
@@ -75,6 +77,7 @@ export default function App() {
               <Route path="staff/checkout" element={<StaffCheckout />} />
               <Route path="staff/chon-cong/:operation" element={<StaffGateSelection />} />
               <Route path="staff/exception" element={<StaffException />} />
+              <Route path="staff/cash" element={<StaffCashHolding />} />
 
               <Route path="admin/dashboard" element={<AdminDashboard />} />
               <Route path="admin/users" element={<AdminUsers />} />
@@ -98,6 +101,7 @@ export default function App() {
               <Route path="manager/sessions" element={<ManagerParkingSessions />} />
               <Route path="manager/reservations" element={<ManagerReservations />} />
               <Route path="manager/payments" element={<ManagerPayments />} />
+              <Route path="manager/cash-ledger" element={<ManagerCashLedger />} />
               <Route path="manager/vehicle-change-requests" element={<ManagerVehicleChangeRequests />} />
               <Route path="manager/incidents" element={<ManagerIncidents />} />
               <Route path="manager/wallets" element={<ManagerWallets />} />
