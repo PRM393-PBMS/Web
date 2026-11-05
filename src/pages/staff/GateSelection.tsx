@@ -43,6 +43,8 @@ export default function StaffGateSelection() {
   const expectedGateType = operation === 'checkin' ? 'Entry' : 'Exit'
   const [floors, setFloors] = useState<FloorDto[]>([])
   const [gates, setGates] = useState<GateDto[]>([])
+  const [parkingId, setParkingId] = useState('')
+  const [saving, setSaving] = useState(false)
   const [floorId, setFloorId] = useState('')
   const [gateId, setGateId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -78,6 +80,7 @@ export default function StaffGateSelection() {
     })
   }, [expectedGateType])
 
+  const parkings = [...new Map(floors.filter(f => f.parkingId && f.parkingName).map(f => [f.parkingId!, { id: f.parkingId!, name: f.parkingName! }])).values()]
   const selectedFloor = floors.find((floor) => floor.floorId === floorId)
   const availableGates = useMemo(
     () => gates.filter((gate) => gate.floorId === floorId),
@@ -90,9 +93,16 @@ export default function StaffGateSelection() {
     setGateId('')
   }
 
-  const continueToOperation = () => {
-    if (!selectedFloor || !selectedGate) return
+  const continueToOperation = async () => {
+    if (saving || !selectedFloor || !selectedGate || !selectedFloor.parkingId || !selectedFloor.parkingName) return
+    setSaving(true)
+    setError('')
+    try {
+    const claim = await gateScanApi.claimGate(selectedGate.gateId)
+    if (!claim.isSuccess) throw new Error('Chưa đồng bộ được cổng trực. Vui lòng thử lại.')
     saveStaffGateContext({
+      parkingId: selectedFloor.parkingId,
+      parkingName: selectedFloor.parkingName,
       operation,
       floorId: selectedFloor.floorId,
       floorName: selectedFloor.floorName,
@@ -104,7 +114,7 @@ export default function StaffGateSelection() {
       gateType: expectedGateType,
     })
     // Điện thoại máy quét của cùng tài khoản đổi theo cổng này.
-    void gateScanApi.claimGate(selectedGate.gateId).catch(() => {})
+
     const checkInDestination =
       destination === 'reservations'
         ? '/staff/reservations'
@@ -114,6 +124,9 @@ export default function StaffGateSelection() {
     navigate(operation === 'checkin' ? checkInDestination : '/staff/checkout', {
       state: { ...(initialState ?? {}), gateAccessGranted: true },
     })
+    } catch (reason) {
+      setError(apiErrorMessage(reason, 'Chưa lưu được cổng trực. Kiểm tra kết nối rồi thử lại.'))
+    } finally { setSaving(false) }
   }
 
   return (
@@ -126,7 +139,7 @@ export default function StaffGateSelection() {
             </span>
             <div>
               <h2>Chọn vị trí {operation === 'checkin' ? 'check-in' : 'check-out'}</h2>
-              <p>Chọn đúng tầng trước, sau đó chọn cổng thuộc tầng để bắt đầu nghiệp vụ.</p>
+              <p>Chọn đúng bãi, tầng và cổng bạn đang trực để bắt đầu nghiệp vụ.</p>
             </div>
           </div>
         </header>
@@ -142,6 +155,14 @@ export default function StaffGateSelection() {
         {error && <div className="manager-inline-error" role="alert">{error}</div>}
 
         <section className="card-panel staff-gate-selection-panel">
+          <label htmlFor="staff-parking">Bãi đang trực</label>
+          <select id="staff-parking" className="form-input" value={parkingId} disabled={loading || saving} onChange={event => {
+            setParkingId(event.target.value); setFloorId(''); setGateId('')
+          }}>
+            <option value="">Chọn bãi đỗ</option>
+            {parkings.map(parking => <option key={parking.id} value={parking.id}>{parking.name}</option>)}
+          </select>
+          {!loading && parkings.length === 0 && <p role="status">Chưa tải được thông tin bãi của các tầng. Vui lòng liên hệ quản lý.</p>}
           <div className="scan-card-heading">
             <span className="scan-step-badge">1</span>
             <div><h3>Chọn tầng vận hành</h3><p>Nhóm khách và loại xe được lấy từ cấu hình của tầng.</p></div>
@@ -150,7 +171,7 @@ export default function StaffGateSelection() {
             <div className="manager-empty-state">Đang tải cấu hình...</div>
           ) : (
             <div className="staff-floor-choice-grid">
-              {floors.map((floor) => {
+              {floors.filter(floor => floor.parkingId === parkingId).map((floor) => {
                 const gateCount = gates.filter((gate) => gate.floorId === floor.floorId).length
                 const selected = floor.floorId === floorId
                 const allowsReservation =
@@ -212,8 +233,8 @@ export default function StaffGateSelection() {
               <><strong>{selectedFloor.parkingName ? `${selectedFloor.parkingName} · ` : ''}{selectedFloor.floorName} · {selectedGate.gateName}</strong><span>{selectedFloor.isResident ? 'Cư dân' : isCarVehicleTypeName(selectedFloor.dedicatedVehicleTypeName) ? 'Khách / đặt trước' : 'Khách vãng lai'} · {selectedFloor.dedicatedVehicleTypeName || 'Nhiều loại xe'}</span></>
             ) : <span>Hãy hoàn tất 2 bước để tiếp tục.</span>}
           </div>
-          <button type="button" className="btn btn-primary" disabled={!selectedFloor || !selectedGate} onClick={continueToOperation}>
-            Vào trang {operation === 'checkin' ? 'check-in' : 'check-out'} <ArrowRight size={17} />
+          <button type="button" className="btn btn-primary" disabled={saving || !selectedFloor || !selectedGate} onClick={continueToOperation}>
+            {saving ? 'Đang đồng bộ…' : 'Vào trang'} {operation === 'checkin' ? 'check-in' : 'check-out'} <ArrowRight size={17} />
           </button>
         </div>
       </div>

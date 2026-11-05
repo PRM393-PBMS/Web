@@ -758,7 +758,7 @@ export default function Checkout() {
                 <div>
                   <MapPin size={18} aria-hidden />
                   <span>
-                    <strong>{gateContext.floorName} · {gateContext.gateName}</strong>
+                    <strong>{gateContext.parkingName} · {gateContext.floorName} · {gateContext.gateName}</strong>
                     <small>
                       {gateContext.isResident ? 'Tầng cư dân' : 'Tầng khách / đặt trước'}
                       {' · '}

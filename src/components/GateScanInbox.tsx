@@ -22,7 +22,9 @@ function suggestionOf(scan: GateScan): { label: string; tone: 'ok' | 'warn' | 'd
     case 'resident':
       return { label: 'Khách vé tháng', tone: 'ok' }
     case 'entrypass':
-      return { label: 'Đã đăng ký gửi 1 lần', tone: 'ok' }
+      return scan.match?.entryPass?.matchesParking === false
+        ? { label: scan.match.entryPass.parkingName ? `Đăng ký tại ${scan.match.entryPass.parkingName} · sai bãi` : 'Đăng ký chưa chọn bãi · cần tạo lại', tone: 'danger' }
+        : { label: 'Đã đăng ký gửi 1 lần', tone: 'ok' }
     case 'guest':
       return { label: 'Khách vãng lai', tone: 'info' }
     case 'inside':

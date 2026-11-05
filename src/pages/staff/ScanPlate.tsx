@@ -925,7 +925,7 @@ export default function ScanPlate({ initialPanel = "scan" }: ScanPlateProps) {
                   {gateContext && activePanel === "scan" && (
                     <span className="staff-gate-context-badge">
                       <MapPin size={14} aria-hidden />
-                      {gateContext.floorName} · {gateContext.gateName}
+                      {gateContext.parkingName} · {gateContext.floorName} · {gateContext.gateName}
                       <small>
                         ·{" "}
                         {gateContext.isResident

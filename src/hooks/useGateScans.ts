@@ -14,6 +14,7 @@ export function useGateScans(gateId: string) {
     'connecting' | 'connected' | 'retrying' | 'error'
   >('connecting')
   const [error, setError] = useState('')
+  const [gateWarning, setGateWarning] = useState('')
   const [selectedScan, setSelectedScan] = useState<GateScan | null>(null)
   /** Biển số web tự đọc từ ảnh, theo scanId; null = đã đọc nhưng không ra. */
   const [webPlates, setWebPlates] = useState<Record<string, string | null>>({})
@@ -37,6 +38,18 @@ export function useGateScans(gateId: string) {
     const connect = async () => {
       const attempt = ++generation
       try {
+        const currentGate = await gateScanApi.myGate()
+        if (controller.signal.aborted) return
+        if (!currentGate.isSuccess) throw new Error('Chưa kiểm tra được cổng trực.')
+        if (currentGate.result && currentGate.result.gateId !== gateId) {
+          setConnection('error')
+          setError('Cổng trực đã đổi trên thiết bị khác. Vui lòng chọn lại cùng bãi và cổng trên web trước khi tiếp tục.')
+          return
+        }
+        if (!currentGate.result) {
+          const claim = await gateScanApi.claimGate(gateId)
+          if (!claim.isSuccess) throw new Error('Chưa đồng bộ được cổng trực.')
+        }
         const response = await apiClient.openEventStream(
           `/GateScan/stream?gateId=${encodeURIComponent(gateId)}`,
           controller.signal,
@@ -49,7 +62,7 @@ export function useGateScans(gateId: string) {
         setError('')
         failures = 0
         // Mỗi lần (kết nối lại) đều báo cổng: máy chủ chỉ nhớ trong bộ nhớ, khởi động lại là mất.
-        void gateScanApi.claimGate(gateId).catch(() => {})
+
         // Subscribe before loading history; live events win over an older history response.
         const liveIds = new Set<string>()
         let historyLoaded = false
@@ -124,6 +137,28 @@ export function useGateScans(gateId: string) {
     }
   }, [gateId])
 
+  useEffect(() => {
+    if (!gateId) return
+    let disposed = false
+    let checking = false
+    const check = async () => {
+      if (checking) return
+      checking = true
+      try {
+        const result = await gateScanApi.myGate()
+        if (disposed) return
+        if (!result.isSuccess) throw new Error('Không tải được cổng trực')
+        setGateWarning(result.result && result.result.gateId !== gateId
+          ? 'Cổng trực đã đổi trên thiết bị khác. Hãy chọn lại cùng bãi và cổng trên web; không xử lý xe ở vị trí cũ.' : '')
+      } catch {
+        if (!disposed) setGateWarning('Chưa kiểm tra được cổng trực. Kiểm tra kết nối trước khi xử lý xe.')
+      } finally { checking = false }
+    }
+    void check()
+    const timer = setInterval(() => { void check() }, 4000)
+    return () => { disposed = true; clearInterval(timer) }
+  }, [gateId])
+
   const markStatus = useCallback(
     async (
       id: string | undefined,
@@ -178,7 +213,7 @@ export function useGateScans(gateId: string) {
   return {
     scans: visibleScans,
     connection,
-    error,
+    error: gateWarning || error,
     markStatus,
     clearSelection,
     /** Lượt quét web đang tự đọc biển số. */

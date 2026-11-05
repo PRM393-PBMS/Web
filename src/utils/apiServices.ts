@@ -37,6 +37,8 @@ export interface ParkingSlotDto {
 }
 
 export interface GateDto {
+  parkingId?: string
+  parkingName?: string
   gateId: string
   gateName: string
   gateType: 'Entry' | 'Exit' | string

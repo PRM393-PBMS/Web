@@ -2,6 +2,8 @@ export type StaffGateOperation = 'checkin' | 'checkout'
 
 export interface StaffGateContext {
   operation: StaffGateOperation
+  parkingId: string
+  parkingName: string
   floorId: string
   floorName: string
   isResident: boolean
@@ -43,6 +45,8 @@ export function readStaffGateContext(operation: StaffGateOperation): StaffGateCo
     const context = JSON.parse(raw) as StaffGateContext
     if (
       context.operation !== operation ||
+      !context.parkingId ||
+      !context.parkingName ||
       !context.floorId ||
       !context.gateId ||
       !context.floorName ||

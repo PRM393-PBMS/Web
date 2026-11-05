@@ -1,0 +1,24 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+const source = readFileSync(new URL('../src/utils/staffGateContext.ts', import.meta.url), 'utf8');
+const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText;
+const context = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+const values = new Map();
+globalThis.sessionStorage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+const valid = { operation: 'checkin', parkingId: 'parking-a', parkingName: 'Bãi A', floorId: 'floor-a', floorName: 'B1', gateId: 'entry-a', gateName: 'Cổng 1', gateType: 'Entry', isResident: false };
+context.saveStaffGateContext(valid);
+assert.deepEqual(context.readStaffGateContext('checkin'), valid);
+assert.equal(context.readStaffGateContext('checkout'), null);
+values.set('pbms.staff-gate-context.checkin', '{bad json');
+assert.equal(context.readStaffGateContext('checkin'), null);
+const legacy = { ...valid }; delete legacy.parkingId; delete legacy.parkingName;
+context.saveStaffGateContext(legacy);
+assert.equal(context.readStaffGateContext('checkin'), null);
+context.saveStaffGateContext({ ...valid, parkingId: '', parkingName: '' });
+assert.equal(context.readStaffGateContext('checkin'), null);
+context.saveStaffGateContext({ ...valid, parkingId: 'parking-b', parkingName: 'Bãi B', floorId: 'floor-b', gateId: 'entry-b' });
+assert.equal(context.readStaffGateContext('checkin').parkingName, 'Bãi B');
+assert.equal(context.readStaffGateContext('checkin').floorName, 'B1');
+console.log('PASS 6 staff gate context cases (pure logic; no API/DB/UI)');
+

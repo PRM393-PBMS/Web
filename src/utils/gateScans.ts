@@ -17,12 +17,14 @@ export interface GateScan {
   suggestedType: string
   reservationId: string | null
   match: {
+    entryPass?: { entryPassId: string; parkingId: string | null; parkingName: string | null; matchesParking: boolean } | null
     reservation?: { reservationId: string; onTime: boolean } | null
     activeSession?: { sessionId: string } | null
   } | null
 }
 
 export const gateScanApi = {
+  myGate: () => apiClient.get<ApiResponse<{ gateId: string; parkingName?: string } | null>>('/GateScan/my-gate'),
   recent: (gateId: string) =>
     apiClient.get<ApiResponse<GateScan[]>>(
       `/GateScan/recent?gateId=${encodeURIComponent(gateId)}&limit=20`,
